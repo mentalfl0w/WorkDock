@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+    branches: ['**']
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  build:
+    name: Build (macOS)
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: brew install libxml2 pkg-config
+
+      - name: Build
+        run: swift build -c debug
+
+      - name: Package app bundle
+        run: |
+          BIN="$(swift build --show-bin-path)/WorkDock"
+          APP=".build/WorkDock.app"
+          rm -rf "$APP"
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+          cp "$BIN" "$APP/Contents/MacOS/WorkDock"
+          cp logo.png "$APP/Contents/Resources/logo.png"
+          if [ -f AppIcon.icns ]; then cp AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"; fi
+          if [ -f Info.plist ]; then cp Info.plist "$APP/Contents/Info.plist"; fi
+          chmod +x "$APP/Contents/MacOS/WorkDock"
+          codesign --force --deep --sign - "$APP" 2>/dev/null || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WorkDock-macOS-${{ github.sha }}
+          path: .build/WorkDock.app
+          retention-days: 7

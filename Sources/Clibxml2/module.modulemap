@@ -1,0 +1,3 @@
+module Clibxml2 [extern_c] {
+    link "xml2"
+}
