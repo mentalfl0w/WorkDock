@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "WorkDock",
+    defaultLocalization: "en",
     platforms: [.macOS(.v26)],
     targets: [
         .systemLibrary(
@@ -18,7 +19,8 @@ let package = Package(
         .executableTarget(
             name: "WorkDock",
             dependencies: ["XMLBridge"],
-            path: "Sources/WorkDock"
-        )
+            path: "Sources/WorkDock",
+            resources: [.process("Resources")]
+        ),
     ]
 )

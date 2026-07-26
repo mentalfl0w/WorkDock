@@ -37,6 +37,7 @@ jobs:
           cp logo.png "$APP/Contents/Resources/logo.png"
           if [ -f AppIcon.icns ]; then cp AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"; fi
           if [ -f Info.plist ]; then cp Info.plist "$APP/Contents/Info.plist"; fi
+          if [ -d Sources/WorkDock/Resources ]; then cp -R Sources/WorkDock/Resources/*.lproj "$APP/Contents/Resources/" 2>/dev/null || true; fi
           chmod +x "$APP/Contents/MacOS/WorkDock"
           codesign --force --deep --sign - "$APP" 2>/dev/null || true
 

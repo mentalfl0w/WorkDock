@@ -4,6 +4,8 @@
 <dict>
     <key>CFBundleName</key>
     <string>WorkDock</string>
+    <key>CFBundleDisplayName</key>
+    <string>WorkDock</string>
     <key>CFBundleIdentifier</key>
     <string>cn.liujiangnan.WorkDock</string>
     <key>CFBundleVersion</key>
