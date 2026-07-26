@@ -1,3 +1,4 @@
-module Clibxml2 [extern_c] {
+module Clibxml2 [system] {
+    export libxml2
     link "xml2"
 }

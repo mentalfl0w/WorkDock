@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install dependencies
-        run: brew install libxml2 pkg-config create-dmg
+        run: brew install pkg-config create-dmg
 
       - name: Build
         run: swift build -c release

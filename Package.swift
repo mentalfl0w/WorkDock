@@ -7,8 +7,7 @@ let package = Package(
     targets: [
         .systemLibrary(
             name: "Clibxml2",
-            path: "Sources/Clibxml2",
-            pkgConfig: "libxml-2.0"
+            path: "Sources/Clibxml2"
         ),
         .target(
             name: "XMLBridge",
