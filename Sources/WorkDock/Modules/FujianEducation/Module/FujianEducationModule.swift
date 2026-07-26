@@ -71,7 +71,7 @@ public final class FujianEducationModule: Module, CredentialStore {
             return [
                 .action(title: L.notSignedIn, icon: "person.crop.circle.badge.exclaimmark") { [weak self] in
                     guard let self else { return }
-                    await self.openMain(route: ["tab": "unread"])
+                    self.openMain(route: ["tab": "unread"])
                 }
             ]
         }
@@ -80,13 +80,13 @@ public final class FujianEducationModule: Module, CredentialStore {
         var items: [ModuleMenuItem] = [
             .action(title: L.unreadMenuCount(unread), icon: "envelope.badge") { [weak self] in
                 guard let self else { return }
-                await self.openMain(route: ["tab": "unread"])
+                self.openMain(route: ["tab": "unread"])
             }
         ]
         if let latest = latest {
             items.append(.action(title: latest.title, icon: "doc.text") { [weak self] in
                 guard let self else { return }
-                await self.openDetail(unid: latest.id)
+                self.openDetail(unid: latest.id)
             })
         }
         return items

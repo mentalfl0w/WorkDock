@@ -34,7 +34,7 @@ public final class Persistence: @unchecked Sendable {
     }
 
     /// Persist a `Codable` value for a module.
-    public func store<T: Encodable>(_ value: T, moduleID: String, key: String) {
+    public func store<T: Encodable & Sendable>(_ value: T, moduleID: String, key: String) {
         let cacheKey = "\(moduleID).\(key)"
         let url = path(moduleID: moduleID, key: key)
         queue.async(flags: .barrier) {

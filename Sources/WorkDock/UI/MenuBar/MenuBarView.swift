@@ -57,7 +57,6 @@ struct MenuItemsView: View {
         }
     }
 
-    @ViewBuilder
     private func renderItem(_ item: ModuleMenuItem) -> AnyView {
         switch item {
         case .action(let title, let icon, let handler):

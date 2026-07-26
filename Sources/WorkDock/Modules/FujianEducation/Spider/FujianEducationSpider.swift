@@ -266,7 +266,7 @@ public actor FujianEducationSpider {
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = body.data(using: .utf8)
-        let (data, resp) = try await send(req)
+        let (data, _) = try await send(req)
         guard let arr = try JSONSerialization.jsonObject(with: data) as? [[Any]],
               let first = arr.first, first.count >= 1,
               let raw = first[0] as? [String: Any] else {
@@ -409,8 +409,8 @@ public actor FujianEducationSpider {
 /// final 200 response to the caller. Forwards cookies via a callback so the
 /// spider can store them in its manual cookie jar.
 private final class RedirectCookieInterceptor: NSObject, URLSessionTaskDelegate {
-    let onCookie: (String, String) -> Void
-    init(onCookie: @escaping (String, String) -> Void) {
+    let onCookie: @Sendable (String, String) -> Void
+    init(onCookie: @escaping @Sendable (String, String) -> Void) {
         self.onCookie = onCookie
         super.init()
     }
@@ -432,7 +432,7 @@ private final class RedirectCookieInterceptor: NSObject, URLSessionTaskDelegate 
 /// Thread-safe cookie container shared between the actor and the
 /// URLSession delegate. Uses `OSAllocatedUnfairLock` so the non-isolated
 /// delegate callback can mutate cookies without crossing actor boundaries.
-private final class CookieBox {
+private final class CookieBox: @unchecked Sendable {
     private let lock = OSAllocatedUnfairLock(initialState: [String: String]())
     func set(_ name: String, _ value: String) { lock.withLock { $0[name] = value } }
     func snapshot() -> [String: String] { lock.withLock { $0 } }

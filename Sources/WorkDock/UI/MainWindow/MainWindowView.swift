@@ -134,8 +134,10 @@ struct ModuleHostView: View {
         module.mainView()
             .frame(minWidth: 480, idealWidth: 600, maxWidth: .infinity, minHeight: 400, idealHeight: 540, maxHeight: .infinity)
             .environment(\.moduleBackAction, {
-                withAnimation(.spring(duration: 0.3)) {
-                    router.selectedModuleID = nil
+                Task { @MainActor in
+                    withAnimation(.spring(duration: 0.3)) {
+                        router.selectedModuleID = nil
+                    }
                 }
             })
     }
