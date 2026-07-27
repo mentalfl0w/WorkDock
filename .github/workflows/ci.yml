@@ -1,17 +1,52 @@
 name: CI
 
+# Unified CI / Release pipeline.
+#
+# Triggers:
+#   - push to any branch  → build + upload DMG artifact ("latest")
+#   - pull_request        → build + upload DMG artifact ("latest")
+#   - tag push v*         → build + publish GitHub Release with DMG attached
+#   - workflow_dispatch   → release flow with explicit version
+#
+# Tag pushes are filtered by the `tags` filter so they do NOT double-trigger
+# the branch-build flow.
+
 on:
   push:
-    branches: ['**']
-    tags: ['v*']
+    branches:
+      - '**'
+    tags:
+      - 'v*'
   pull_request:
-    branches: ['**']
+    branches:
+      - '**'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version tag (e.g. v0.1.0). Must start with v.'
+        required: true
+        type: string
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        default: false
+        type: boolean
 
+permissions:
+  contents: write   # needed for the release job (tag-push)
+
+# Cancel superseded runs on the same ref (PRs / branches only — releases are
+# left alone by giving them a unique concurrency group).
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Build job: runs on every trigger. Produces a signed DMG and uploads it
+  # as a build artifact. On tag pushes the same DMG is attached to the
+  # GitHub Release by the release job below.
+  # ---------------------------------------------------------------------------
   build:
     name: Build (macOS)
     runs-on: macos-latest
@@ -20,12 +55,30 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # fetch-depth 0 on tag pushes so the release job can scope the
+          # changelog commit range; shallow otherwise to save time.
+          fetch-depth: ${{ startsWith(github.ref, 'refs/tags/v') && 0 || 1 }}
 
       - name: Install dependencies
         run: brew install pkg-config create-dmg
 
       - name: Build
         run: swift build -c release
+
+      - name: Resolve release version
+        id: meta
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [ "${{ startsWith(github.ref, 'refs/tags/v') }}" = "true" ]; then
+            VERSION="${GITHUB_REF_NAME}"
+          else
+            VERSION="latest"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Resolved version=$VERSION"
 
       - name: Package app bundle
         run: |
@@ -50,9 +103,146 @@ jobs:
             WorkDock.dmg \
             .build/WorkDock.app
 
-      - name: Upload artifact
+      - name: Rename DMG with version
+        shell: bash
+        run: |
+          mv WorkDock.dmg "WorkDock-macOS-${{ steps.meta.outputs.version }}.dmg"
+          ls -lh WorkDock-*.dmg
+
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: WorkDock-macOS-${{ github.sha }}
-          path: WorkDock.dmg
+          name: WorkDock-macOS-${{ steps.meta.outputs.version }}-${{ github.sha }}
+          path: WorkDock-macOS-*.dmg
           retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Release job: only runs on tag pushes (or manual dispatch). Generates a
+  # Conventional Commits changelog and creates the GitHub Release, attaching
+  # the DMG produced by the build job.
+  # ---------------------------------------------------------------------------
+  release:
+    name: Publish Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout (full history for changelog)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          path: assets
+          pattern: WorkDock-macOS-*
+          merge-multiple: false
+
+      - name: Flatten DMG into release dir
+        shell: bash
+        run: |
+          set -e
+          mkdir -p release-assets
+          find assets -type f -name "*.dmg" -exec cp {} release-assets/ \;
+          ls -lh release-assets/
+
+      - name: Resolve release version
+        id: ver
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME}"
+          fi
+          case "$VERSION" in
+            v*) ;;
+            *) VERSION="v$VERSION" ;;
+          esac
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Resolved release version: $VERSION"
+
+      - name: Generate changelog from conventional commits
+        id: changelog
+        shell: bash
+        run: |
+          set -e
+          # Determine the previous release tag to scope the commit range.
+          # Exclude the current tag so the changelog covers "previous..this".
+          PREV_TAG=$(git tag --sort=-creatordate --list 'v*' | grep -v "^${GITHUB_REF_NAME:-v}$" | head -n 1 || true)
+          if [ -n "$PREV_TAG" ]; then
+            RANGE="${PREV_TAG}..HEAD"
+          else
+            # First release: include the entire history.
+            RANGE="HEAD"
+          fi
+          echo "Commit range: $RANGE"
+
+          {
+            echo "## What's Changed"
+            echo ""
+
+            print_section() {
+              local TYPE="$1"
+              local TITLE="$2"
+              local COMMITS
+              COMMITS=$(git log --pretty=format:"%s" "$RANGE" 2>/dev/null | grep -E "^${TYPE}(\(.+\))?(!)?:" || true)
+              if [ -n "$COMMITS" ]; then
+                echo "### $TITLE"
+                echo "$COMMITS" | sed -E "s/^${TYPE}(\(([^)]+)\))?(!)?:[[:space:]]*/- \2: /" | sed -E "s/^- :[[:space:]]*/- /"
+                echo ""
+              fi
+            }
+
+            print_section "feat"     "✨ Features"
+            print_section "fix"      "🐛 Bug Fixes"
+            print_section "perf"     "⚡ Performance"
+            print_section "refactor" "♻️ Refactor"
+            print_section "docs"     "📝 Documentation"
+            print_section "test"     "✅ Tests"
+            print_section "chore"    "🔧 Chore"
+            print_section "build"    "📦 Build"
+            print_section "ci"       "👷 CI"
+            print_section "style"    "💄 Style"
+
+            echo "### 📋 Full Commit List"
+            git log --pretty=format:"- %s (%h)" "$RANGE" 2>/dev/null || true
+            echo ""
+          } > /tmp/changelog.txt
+
+          {
+            echo "content<<CHANGELOG_EOF"
+            cat /tmp/changelog.txt
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Resolve pre-release flag
+        id: pre
+        shell: bash
+        run: |
+          VERSION="${{ steps.ver.outputs.version }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            PRE="${{ github.event.inputs.prerelease }}"
+          else
+            case "$VERSION" in
+              *-rc*|*-alpha*|*-beta*|*-pre*) PRE="true" ;;
+              *) PRE="false" ;;
+            esac
+          fi
+          echo "prerelease=$PRE" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.version }}
+          name: ${{ steps.ver.outputs.version }}
+          body: ${{ steps.changelog.outputs.content }}
+          prerelease: ${{ steps.pre.outputs.prerelease == 'true' }}
+          files: release-assets/*.dmg
+          generate_release_notes: false
+          make_latest: true
