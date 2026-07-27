@@ -58,16 +58,29 @@ public final class FujianEducationModule: Module, CredentialStore {
                 lastValidatedAt = ContinuousClock.now
                 return true
             } catch {
-                log.warning("session validation failed, marking signed-out: \(error.localizedDescription, privacy: .public)")
-                await spider.invalidateSession()
-                lastValidatedAt = nil
-                return false
+                // Transient network failure — do NOT invalidate the session.
+                // The cookie may still be valid; a network blip should not log
+                // the user out. Return the last known state instead.
+                log.warning("session validation failed (transient): \(error.localizedDescription, privacy: .public)")
+                return await spider.isLoggedIn
             }
         }
     }
 
     public func menuItems() async -> [ModuleMenuItem] {
-        guard let spider = spider, await spider.isLoggedIn else {
+        // Use isSignedIn (with 30s cache) so the menu stays in sync with the
+        // main view's login state. Direct spider.isLoggedIn can go false after
+        // a transient validation failure, causing "not signed in" to show
+        // even though the session is still alive.
+        guard await isSignedIn else {
+            return [
+                .action(title: L.notSignedIn, icon: "person.crop.circle.badge.exclaimmark") { [weak self] in
+                    guard let self else { return }
+                    self.openMain(route: ["tab": "unread"])
+                }
+            ]
+        }
+        guard let spider = spider else {
             return [
                 .action(title: L.notSignedIn, icon: "person.crop.circle.badge.exclaimmark") { [weak self] in
                     guard let self else { return }
