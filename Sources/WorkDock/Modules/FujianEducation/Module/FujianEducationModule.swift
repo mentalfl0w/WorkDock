@@ -317,9 +317,14 @@ public final class FujianEducationModule: Module, CredentialStore {
         return try await spider.signDocument(unid: unid)
     }
 
-    public func search(_ word: String, isRead: Bool = true) async throws -> (count: Int, documents: [DocumentSummary]) {
+    public func search(_ word: String, pageSize: Int = 20, isRead: Bool = true) async throws -> (docs: [DocumentSummary], noteIDs: [String], total: Int) {
         guard let spider = spider else { throw SpiderError.notLoggedIn }
-        return try await spider.search(word, pageSize: 30, isRead: isRead, noteIDs: [])
+        return try await spider.search(word, pageSize: pageSize, isRead: isRead)
+    }
+
+    public func searchPage(noteIDs: [String], isRead: Bool = true) async throws -> [DocumentSummary] {
+        guard let spider = spider else { throw SpiderError.notLoggedIn }
+        return try await spider.searchPage(noteIDs: noteIDs, isRead: isRead)
     }
 
     @MainActor

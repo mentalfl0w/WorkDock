@@ -298,25 +298,58 @@ public actor FujianEducationSpider {
 
     // MARK: - Search
 
-    public func search(_ word: String, pageSize: Int = 10, isRead: Bool = true, noteIDs: [String] = []) async throws -> (count: Int, documents: [DocumentSummary]) {
+    public func search(_ word: String, pageSize: Int = 20, isRead: Bool = true) async throws -> (docs: [DocumentSummary], noteIDs: [String], total: Int) {
+        // First page: POST #Condition=<keyword>, URL has Count=pageSize&Start=1
+        // Server returns ALL matching viewentry nodes as placeholders, but only
+        // the first `pageSize` have entrydata details. We extract noteid from
+        // ALL nodes for subsequent page fetches, and details from the first page.
         var url = "\(Self.searchBase)&Server=CN=FJSJYT/OU=SRV/O=FJJY&DbName=docs/10003.nsf&View=\(isRead ? "ReceivedByTime" : "ToReceiveSort")"
-        var body: String
-        if noteIDs.isEmpty {
-            let esc = word.unicodeScalars.reduce(into: "") { r, s in
-                r += s.value > 127 ? "%u\(String(s.value, radix: 16, uppercase: false))" : String(s)
-            }
-            body = "#Condition=\(esc)"
-            url += "&Count=\(pageSize)&Start=1&FTSearch=1&Sort=1&SortColumn=2"
-        } else {
-            var dbs = "&dbs="
-            var ids = "&ids="
-            for (i, nid) in noteIDs.enumerated() {
-                dbs += "docs/10003.nsf,"
-                ids += i == noteIDs.count - 1 ? nid : "\(nid),"
-            }
-            dbs += "docs\\10003.nsf"
-            body = dbs + ids
+        let esc = word.unicodeScalars.reduce(into: "") { r, s in
+            r += s.value > 127 ? "%u\(String(s.value, radix: 16, uppercase: false))" : String(s)
         }
+        let body = "#Condition=\(esc)"
+        url += "&Count=\(pageSize)&Start=1&FTSearch=1&Sort=1&SortColumn=2"
+        var req = URLRequest(url: URL(string: url)!)
+        req.httpMethod = "POST"
+        req.httpBody = body.data(using: .utf8)
+        let (data, _) = try await send(req)
+        let doc = try XMLDocument(xmlData: data)
+        let total = doc.count("//viewentry")
+        // Collect all noteIDs for pagination
+        var allNoteIDs: [String] = []
+        if total > 0 {
+            for i in 1...total {
+                let nid = doc.attr("//viewentry[\(i)]", "noteid") ?? ""
+                allNoteIDs.append(nid)
+            }
+        }
+        // Parse details only for the first pageSize entries
+        var out: [DocumentSummary] = []
+        let to = min(pageSize, total)
+        if to >= 1 {
+            for i in 1...to {
+                out.append(parseSearchEntry(doc, index: i))
+            }
+        }
+        return (out, allNoteIDs, total)
+    }
+
+    /// Fetch details for a specific page of search results using noteIDs.
+    /// The POST body repeats `docs/10003.nsf` once per noteID, followed by
+    /// the comma-joined noteID list.
+    public func searchPage(noteIDs: [String], isRead: Bool = true) async throws -> [DocumentSummary] {
+        guard !noteIDs.isEmpty else { return [] }
+        let url = "\(Self.searchBase)&Server=CN=FJSJYT/OU=SRV/O=FJJY&DbName=docs/10003.nsf&View=\(isRead ? "ReceivedByTime" : "ToReceiveSort")"
+        // Body: &dbs=docs/10003.nsf,docs/10003.nsf,... (repeated noteIDs.count times, last with backslash)
+        //       &ids=id1,id2,...,lastId
+        var dbs = "&dbs="
+        var ids = "&ids="
+        for (i, nid) in noteIDs.enumerated() {
+            dbs += "docs/10003.nsf,"
+            ids += i == noteIDs.count - 1 ? nid : "\(nid),"
+        }
+        dbs += "docs\\10003.nsf"
+        let body = dbs + ids
         var req = URLRequest(url: URL(string: url)!)
         req.httpMethod = "POST"
         req.httpBody = body.data(using: .utf8)
@@ -326,18 +359,22 @@ public actor FujianEducationSpider {
         var out: [DocumentSummary] = []
         if count > 0 {
             for i in 1...count {
-                let subject = xpathFirst(doc, "//viewentry[\(i)]//entrydata[@name='$Subject']/text/text()")
-                let pubTime = xpathFirst(doc, "//viewentry[\(i)]//entrydata[@name='$PublishTime']/text/text()")
-                let unit = xpathFirst(doc, "//viewentry[\(i)]//entrydata[@name='$Unit']/text/text()")
-                let unid = doc.attr("//viewentry[\(i)]", "unid") ?? ""
-                let noteid = doc.attr("//viewentry[\(i)]", "noteid") ?? ""
-                let docMark = xpathFirst(doc, "//viewentry[\(i)]//entrydata[@name='$DocMark']/text/text()")
-                out.append(DocumentSummary(
-                    id: unid, noteID: noteid, title: subject ?? "", publisher: unit ?? "",
-                    publishedAt: pubTime ?? "", docMark: docMark ?? "", urgency: ""))
+                out.append(parseSearchEntry(doc, index: i))
             }
         }
-        return (count, out)
+        return out
+    }
+
+    private func parseSearchEntry(_ doc: XMLDocument, index: Int) -> DocumentSummary {
+        let subject = xpathFirst(doc, "//viewentry[\(index)]//entrydata[@name='$Subject']/text/text()")
+        let pubTime = xpathFirst(doc, "//viewentry[\(index)]//entrydata[@name='$PublishTime']/text/text()")
+        let unit = xpathFirst(doc, "//viewentry[\(index)]//entrydata[@name='$Unit']/text/text()")
+        let unid = doc.attr("//viewentry[\(index)]", "unid") ?? ""
+        let noteid = doc.attr("//viewentry[\(index)]", "noteid") ?? ""
+        let docMark = xpathFirst(doc, "//viewentry[\(index)]//entrydata[@name='$DocMark']/text/text()")
+        return DocumentSummary(
+            id: unid, noteID: noteid, title: subject ?? "", publisher: unit ?? "",
+            publishedAt: pubTime ?? "", docMark: docMark ?? "", urgency: "")
     }
 
     // MARK: - User profile
