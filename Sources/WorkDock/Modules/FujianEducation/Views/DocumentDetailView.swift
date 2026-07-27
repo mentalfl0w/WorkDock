@@ -9,11 +9,13 @@ import SwiftUI
 struct DocumentDetailView: View {
     let detail: DocumentDetail
     let attachments: [Attachment]
+    let canSignin: Bool
     let onClose: () -> Void
     let onSignin: () -> Void
     let onDownloadAttachment: @Sendable (URL, URL) async throws -> Void
 
     @State private var downloading: String?
+    @State private var signedIn = false
     @State private var downloadError: String?
     @State private var batchDownloading = false
     @State private var batchProgress: Double = 0
@@ -120,12 +122,17 @@ struct DocumentDetailView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.large)
                 Spacer()
-                Button(action: onSignin) {
-                    Label(L.signin, systemImage: "checkmark.circle.fill")
-                        .font(.body.weight(.medium))
+                if canSignin && !signedIn {
+                    Button(action: {
+                        signedIn = true
+                        onSignin()
+                    }) {
+                        Label(L.signin, systemImage: "checkmark.circle.fill")
+                            .font(.body.weight(.medium))
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)

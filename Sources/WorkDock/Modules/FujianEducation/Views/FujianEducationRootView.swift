@@ -46,6 +46,7 @@ struct FujianEducationRootView: View {
                     .allowsHitTesting(false)
                 DocumentDetailView(detail: d,
                                    attachments: store.attachments,
+                                   canSignin: store.tab == .unread,
                                    onClose: { store.detail = nil },
                                    onSignin: { Task { await store.signin(module: module) } },
                                    onDownloadAttachment: { src, dest in
@@ -59,10 +60,11 @@ struct FujianEducationRootView: View {
 
     private var mainContent: some View {
         ModuleContainerView(title: module.displayName) {
-            VStack(spacing: 0) {
+            VStack(spacing: 8) {
                 tabBar
                 content
             }
+
         }
     }
     private var tabBar: some View {
@@ -100,7 +102,7 @@ struct FujianEducationRootView: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .glassEffect(in: .rect(cornerRadius: 10))
     }

@@ -54,17 +54,7 @@ struct DemoModuleView: View {
                     pageSize: pageSize,
                     onPageSizeChange: { pageSize = $0 })
 
-                // Button to open detail view
-                Button {
-                    showDetail = true
-                } label: {
-                    Label(L.demoOpenDocDetail, systemImage: "doc.richtext")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
+
             }
         }
         .sheet(isPresented: $showDetail) {
@@ -75,6 +65,7 @@ struct DemoModuleView: View {
                 DocumentDetailView(
                     detail: mockDetail,
                     attachments: mockAttachments,
+                    canSignin: true,
                     onClose: { showDetail = false },
                     onSignin: {},
                     onDownloadAttachment: { _, _ in
