@@ -57,6 +57,8 @@ struct ModuleContainerView<Content: View>: View {
             .overlay(alignment: .bottom) { Divider().opacity(0.3) }
 
             content()
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
         }
     }
 }

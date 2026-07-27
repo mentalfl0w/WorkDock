@@ -12,7 +12,7 @@ struct DocumentListView: View {
     var onPageSizeChange: (Int) -> Void = { _ in }
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 8) {
             // Header: count + page size + refresh
             HStack {
                 Text(L.totalCount(totalCountDisplay, page: currentPage, total: totalPages))
@@ -34,7 +34,7 @@ struct DocumentListView: View {
                 }
                 .buttonStyle(.bordered)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .glassEffect(in: .rect(cornerRadius: 10))
 
@@ -52,9 +52,7 @@ struct DocumentListView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 4)
-                    .padding(.bottom, 12)
+
                 }
             }
 
@@ -83,11 +81,9 @@ struct DocumentListView: View {
                     .disabled(currentPage >= totalPages)
                     .buttonStyle(.bordered)
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 12)
                 .padding(.vertical, 10)
                 .glassEffect(in: .rect(cornerRadius: 10))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
             }
         }
     }

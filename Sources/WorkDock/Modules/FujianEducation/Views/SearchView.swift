@@ -25,8 +25,8 @@ struct SearchView: View {
             }
             .padding(12)
             .glassEffect(in: .rect(cornerRadius: 10))
-            .padding(.horizontal, 8)
-            .padding(.top, 8)
+
+
             DocumentListView(documents: store.results,
                              isLoading: store.loading,
                              onRefresh: { Task { await store.run(module: module, word: input.query, isRead: input.isRead) } },
