@@ -11,7 +11,7 @@ import os
 /// for ``JumpTarget.web`` or handing a ``JumpTarget.route`` to the
 /// ``NavigationRouter`` after bringing the app to front.
 public final class NotificationService: NSObject, @unchecked Sendable {
-    private let log = Logger(subsystem: "cn.liujiangnan.WorkDock", category: "Notification")
+    private let log = Logger(subsystem: "cn.dylanliu.workdock", category: "Notification")
     private var center: UNUserNotificationCenter { UNUserNotificationCenter.current() }
     private weak var router: NavigationRouter?
 

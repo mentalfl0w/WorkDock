@@ -13,7 +13,7 @@ public final class NavigationRouter: ObservableObject {
     @Published public var selectedModuleID: String?
     @Published public var pendingPayload: [String: String]?
 
-    private let log = Logger(subsystem: "cn.liujiangnan.WorkDock", category: "Router")
+    private let log = Logger(subsystem: "cn.dylanliu.workdock", category: "Router")
 
     public init() {}
 

@@ -37,7 +37,7 @@ public actor FujianEducationSpider {
     /// and the actor can both mutate it.
     private let cookieJar: CookieBox = CookieBox()
     private var interceptor: RedirectCookieInterceptor?
-    private let log = Logger(subsystem: "cn.liujiangnan.WorkDock.fjsjyt", category: "Spider")
+    private let log = Logger(subsystem: "cn.dylanliu.workdock.fjsjyt", category: "Spider")
     public private(set) var isLoggedIn = false
     /// Marks the session as invalid (called when a request fails due to expired cookies).
     public func invalidateSession() {

@@ -14,7 +14,7 @@ final class AppContainer: ObservableObject {
     let persistence = Persistence()
     lazy var registry: ModuleRegistry = ModuleRegistry(router: router)
 
-    private let log = Logger(subsystem: "cn.liujiangnan.WorkDock", category: "Container")
+    private let log = Logger(subsystem: "cn.dylanliu.workdock", category: "Container")
 
     init() {
         notifications.attach(router: router)

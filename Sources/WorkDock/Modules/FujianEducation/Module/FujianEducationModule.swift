@@ -18,7 +18,7 @@ public final class FujianEducationModule: Module, CredentialStore {
     private let persistence: Persistence
     public let router: NavigationRouter
     private let notifications: NotificationService
-    private let log = Logger(subsystem: "cn.liujiangnan.WorkDock.fjsjyt", category: "Module")
+    private let log = Logger(subsystem: "cn.dylanliu.workdock.fjsjyt", category: "Module")
 
     private var spider: FujianEducationSpider?
     private var cookieRefreshTask: Task<Void, Never>?

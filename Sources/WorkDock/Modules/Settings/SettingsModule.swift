@@ -43,9 +43,9 @@ public final class SettingsModule: Module {
 struct SettingsModuleView: View {
     @AppStorage("hideDockIcon") private var hideDockIcon = false
     @State private var launchAtLogin = false
-    private let appVersion = "0.1.0"
+    private let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
     private let author = "Dylan Liu"
-    private let log = Logger(subsystem: "cn.liujiangnan.WorkDock", category: "Settings")
+    private let log = Logger(subsystem: "cn.dylanliu.workdock", category: "Settings")
 
     var body: some View {
         ModuleContainerView(title: L.settings) {

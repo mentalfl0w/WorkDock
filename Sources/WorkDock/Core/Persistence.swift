@@ -8,10 +8,10 @@ import os
 /// state (last-seen document ids, pagination cursors, preferences). Credentials
 /// live in ``KeychainStore``.
 public final class Persistence: @unchecked Sendable {
-    private let log = Logger(subsystem: "cn.liujiangnan.WorkDock", category: "Persistence")
+    private let log = Logger(subsystem: "cn.dylanliu.workdock", category: "Persistence")
     private let baseDir: URL
     private var cache: [String: Data] = [:]
-    private let queue = DispatchQueue(label: "cn.liujiangnan.WorkDock.persistence", attributes: .concurrent)
+    private let queue = DispatchQueue(label: "cn.dylanliu.workdock.persistence", attributes: .concurrent)
 
     public init(appName: String = "WorkDock") {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!

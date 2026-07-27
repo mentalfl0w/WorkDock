@@ -11,7 +11,7 @@ import os
 public enum FileCredentialStore {
 
     private static let lock = NSLock()
-    private static let log = Logger(subsystem: "cn.liujiangnan.WorkDock", category: "FileCreds")
+    private static let log = Logger(subsystem: "cn.dylanliu.workdock", category: "FileCreds")
 
     private static var storeURL: URL {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!

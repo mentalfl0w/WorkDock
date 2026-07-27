@@ -9,7 +9,7 @@ import os
 /// unlock prompts, which is why ``FileCredentialStore`` is the default for
 /// development builds.
 public enum KeychainCredentialStore {
-    private static let log = Logger(subsystem: "cn.liujiangnan.WorkDock", category: "KeychainCreds")
+    private static let log = Logger(subsystem: "cn.dylanliu.workdock", category: "KeychainCreds")
 
     public static func set(service: String, account: String, value: String) {
         let data = Data(value.utf8)

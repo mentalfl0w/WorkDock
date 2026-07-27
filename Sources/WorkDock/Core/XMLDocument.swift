@@ -8,7 +8,7 @@ import os
 /// parse once, then issue XPath queries that return strings or counts.
 /// All C memory is owned by this type and freed on deinit.
 public final class XMLDocument {
-    private let log = Logger(subsystem: "cn.liujiangnan.WorkDock", category: "XML")
+    private let log = Logger(subsystem: "cn.dylanliu.workdock", category: "XML")
     private var handle: UnsafeMutablePointer<workdock_xml_t>?
 
     /// Parse an XML string (lxml's `etree.XML`).

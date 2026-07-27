@@ -12,7 +12,7 @@ import os
 public final class FileLog: @unchecked Sendable {
     public static let shared = FileLog()
 
-    private let queue = DispatchQueue(label: "cn.liujiangnan.WorkDock.filelog")
+    private let queue = DispatchQueue(label: "cn.dylanliu.workdock.filelog")
     private let logDir: URL
     private let maxBytes: UInt64 = 1_000_000
     private let maxFiles = 3
@@ -65,5 +65,5 @@ public final class FileLog: @unchecked Sendable {
 /// Convenience for call sites that want both file log + os.Logger.
 public func logBoth(_ message: String, category: String = "App") {
     FileLog.shared.log(message)
-    Logger(subsystem: "cn.liujiangnan.WorkDock", category: category).info("\(message, privacy: .public)")
+    Logger(subsystem: "cn.dylanliu.workdock", category: category).info("\(message, privacy: .public)")
 }

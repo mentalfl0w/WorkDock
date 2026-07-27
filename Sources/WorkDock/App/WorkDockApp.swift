@@ -6,7 +6,7 @@ import os
 @main
 struct WorkDockApp: App {
     @StateObject private var container = AppContainer()
-    private let log = Logger(subsystem: "cn.liujiangnan.WorkDock", category: "App")
+    private let log = Logger(subsystem: "cn.dylanliu.workdock", category: "App")
 
     init() {
         // Register with LaunchServices so notification center can find our icon
@@ -50,6 +50,6 @@ struct WorkDockApp: App {
 }
 
 extension Notification.Name {
-    static let openMainWindow = Notification.Name("cn.liujiangnan.WorkDock.openMainWindow")
+    static let openMainWindow = Notification.Name("cn.dylanliu.workdock.openMainWindow")
 }
 

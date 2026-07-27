@@ -11,7 +11,7 @@ public final class ModuleRegistry: ObservableObject {
     @Published public private(set) var modules: [any Module] = []
     private let router: NavigationRouter
 
-    private let log = Logger(subsystem: "cn.liujiangnan.WorkDock", category: "Registry")
+    private let log = Logger(subsystem: "cn.dylanliu.workdock", category: "Registry")
 
     public init(router: NavigationRouter) {
         self.router = router
