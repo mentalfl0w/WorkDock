@@ -75,6 +75,21 @@ final class FujianEducationStore: ObservableObject {
 
     func signin(module: FujianEducationModule) async {
         guard let unid = detail?.id else { return }
-        _ = try? await module.signDocument(unid: unid)
+        do {
+            let ok = try await module.signDocument(unid: unid)
+            guard ok else { return }
+            // Remove from unread list immediately for responsive UI
+            unread.removeAll { $0.id == unid }
+            unreadTotal = max(0, unreadTotal - 1)
+            // Close detail sheet
+            detail = nil
+            // Refresh unread list from server (authoritative count)
+            await loadUnread(module: module)
+            // If user is on read tab, refresh it too so the signed doc appears
+            if tab == .read { await loadRead(module: module) }
+        } catch {
+            FileLog.shared.log("[FJJYT] signin failed: \(error.localizedDescription)")
+            self.error = error.localizedDescription
+        }
     }
 }
