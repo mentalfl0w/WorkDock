@@ -21,6 +21,9 @@ public final class NavigationRouter: ObservableObject {
     /// View contexts should use `@Environment(\.openWindow)` directly.
     public func openMainWindow() {
         NSApp.activate(ignoringOtherApps: true)
+        for w in NSApp.windows where !w.title.isEmpty {
+            w.makeKeyAndOrderFront(nil)
+        }
         NotificationCenter.default.post(name: .openMainWindow, object: nil)
     }
 
