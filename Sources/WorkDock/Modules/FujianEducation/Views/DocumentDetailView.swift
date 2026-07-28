@@ -88,6 +88,9 @@ struct DocumentDetailView: View {
                                 .disabled(batchDownloading)
                             }
                         }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .glassEffect(in: .rect(cornerRadius: 10))
                         ForEach(attachments, id: \.name) { a in
                             HStack {
                                 Image(systemName: "paperclip")

@@ -107,7 +107,7 @@ public final class FujianEducationModule: Module, CredentialStore {
 
     @MainActor
     public func mainView() -> AnyView {
-        AnyView(FujianEducationRootView(module: self))
+        AnyView(FujianEducationRootView(module: self, router: router))
     }
 
     public func start() async {

@@ -8,6 +8,7 @@ struct FujianEducationRootView: View {
     @StateObject private var store = FujianEducationStore()
     @State private var signedIn = false
     @State private var showSettings = false
+    @ObservedObject var router: NavigationRouter
 
     var body: some View {
         Group {
@@ -38,6 +39,20 @@ struct FujianEducationRootView: View {
         }
         .onChange(of: store.tab) { _, tab in
             if tab == .read && store.read.isEmpty { Task { await store.loadRead(module: module) } }
+        }
+        .onChange(of: router.pendingPayload) { _, payload in
+            guard let payload, signedIn else { return }
+            if let unid = payload["unid"] {
+                Task { await store.loadDetail(module: module, unid: unid) }
+            }
+            if let tab = payload["tab"] {
+                switch tab {
+                case "unread": store.tab = .unread
+                case "read": store.tab = .read
+                case "search": store.tab = .search
+                default: break
+                }
+            }
         }
         .sheet(item: $store.detail) { d in
             ZStack {
