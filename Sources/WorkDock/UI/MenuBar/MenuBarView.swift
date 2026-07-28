@@ -40,8 +40,8 @@ struct ModuleMenuSection: View {
         Section(module.displayName) {
             MenuItemsView(items: items, module: module, router: router)
         }
-        .task(id: module.id) {
-            items = await module.menuItems()
+        .onAppear {
+            Task { items = await module.menuItems() }
         }
     }
 }
