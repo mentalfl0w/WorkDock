@@ -88,18 +88,19 @@ public final class FujianEducationModule: Module, CredentialStore {
                 }
             ]
         }
-        let unread = (try? await spider.unreadCount()) ?? 0
-        let latest = (try? await spider.unreadDocuments(pageSize: 1, start: 1).docs.first)
+        let unreadResult = (try? await spider.unreadDocuments(pageSize: 50, start: 1))
+        let unreadCount = (try? await spider.unreadCount()) ?? unreadResult?.total ?? 0
+        let docs = unreadResult?.docs ?? []
         var items: [ModuleMenuItem] = [
-            .action(title: L.unreadMenuCount(unread), icon: "envelope.badge") { [weak self] in
+            .action(title: L.unreadMenuCount(unreadCount), icon: "envelope.badge") { [weak self] in
                 guard let self else { return }
                 self.openMain(route: ["tab": "unread"])
             }
         ]
-        if let latest = latest {
-            items.append(.action(title: latest.title, icon: "doc.text") { [weak self] in
+        for doc in docs {
+            items.append(.action(title: doc.title, icon: "doc.text") { [weak self] in
                 guard let self else { return }
-                self.openDetail(unid: latest.id)
+                self.openDetail(unid: doc.id)
             })
         }
         return items
