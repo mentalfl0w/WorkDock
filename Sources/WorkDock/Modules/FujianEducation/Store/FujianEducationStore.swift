@@ -83,7 +83,7 @@ final class FujianEducationStore: ObservableObject {
             unreadTotal = max(0, unreadTotal - 1)
             // Close detail sheet
             detail = nil
-            // Refresh unread list from server (authoritative count)
+            NotificationCenter.default.post(name: .fjjytMenuRefresh, object: nil)
             await loadUnread(module: module)
             // If user is on read tab, refresh it too so the signed doc appears
             if tab == .read { await loadRead(module: module) }
@@ -92,4 +92,8 @@ final class FujianEducationStore: ObservableObject {
             self.error = error.localizedDescription
         }
     }
+}
+
+extension Notification.Name {
+    static let fjjytMenuRefresh = Notification.Name("cn.dylanliu.workdock.fjjytMenuRefresh")
 }

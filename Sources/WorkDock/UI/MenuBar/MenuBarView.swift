@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 /// Menu bar dropdown content.
 ///
@@ -35,12 +36,19 @@ struct ModuleMenuSection: View {
     let module: any Module
     @ObservedObject var router: NavigationRouter
     @State private var items: [ModuleMenuItem] = []
+    private let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
     var body: some View {
         Section(module.displayName) {
             MenuItemsView(items: items, module: module, router: router)
         }
-        .onAppear {
+        .task {
+            items = await module.menuItems()
+        }
+        .onReceive(timer) { _ in
+            Task { items = await module.menuItems() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .fjjytMenuRefresh)) { _ in
             Task { items = await module.menuItems() }
         }
     }
