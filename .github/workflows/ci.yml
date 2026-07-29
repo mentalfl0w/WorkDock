@@ -98,7 +98,9 @@ jobs:
         run: |
           create-dmg \
             --volname "WorkDock" \
-            --app-drop-link 180 120 \
+            --window-size 480 300 \
+            --icon "WorkDock.app" 120 120 \
+            --app-drop-link 360 120 \
             --hide-extension "WorkDock.app" \
             WorkDock.dmg \
             .build/WorkDock.app
