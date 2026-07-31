@@ -20,6 +20,9 @@ struct MenuBarView: View {
             Button(L.openApp) {
                 openWindow(id: "main")
                 NSApp.activate(ignoringOtherApps: true)
+                for w in NSApp.windows where !w.title.isEmpty {
+                    w.makeKeyAndOrderFront(nil)
+                }
             }
             .keyboardShortcut("o")
 
