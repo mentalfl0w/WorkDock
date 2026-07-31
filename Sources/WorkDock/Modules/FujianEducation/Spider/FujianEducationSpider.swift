@@ -372,9 +372,12 @@ public actor FujianEducationSpider {
         let unid = doc.attr("//viewentry[\(index)]", "unid") ?? ""
         let noteid = doc.attr("//viewentry[\(index)]", "noteid") ?? ""
         let docMark = xpathFirst(doc, "//viewentry[\(index)]//entrydata[@name='$DocMark']/text/text()")
+        let urgency = xpathFirst(doc, "//viewentry[\(index)]//entrydata[@name='$UrgencyLevel']/text/text()")
+            ?? xpathFirst(doc, "//viewentry[\(index)]//entrydata[@name='$UrgencyLevel']/number/text()")
+            ?? ""
         return DocumentSummary(
             id: unid, noteID: noteid, title: subject ?? "", publisher: unit ?? "",
-            publishedAt: pubTime ?? "", docMark: docMark ?? "", urgency: "")
+            publishedAt: pubTime ?? "", docMark: docMark ?? "", urgency: urgency)
     }
 
     // MARK: - User profile

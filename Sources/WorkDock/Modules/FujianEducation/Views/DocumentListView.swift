@@ -10,7 +10,6 @@ struct DocumentListView: View {
     var onPageChange: (Int) -> Void = { _ in }
     var pageSize: Int = 20
     var onPageSizeChange: (Int) -> Void = { _ in }
-
     var body: some View {
         VStack(spacing: 8) {
             // Header: count + page size + refresh
@@ -95,6 +94,8 @@ struct DocumentListView: View {
 
 struct DocumentRow: View {
     let doc: DocumentSummary
+
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
@@ -124,12 +125,12 @@ struct DocumentRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassEffect(in: .rect(cornerRadius: 12))
     }
-
     private func urgencyLabel(_ u: String) -> String? {
         let v = u.trimmingCharacters(in: .whitespacesAndNewlines)
+        if v.isEmpty { return nil }
         if v.contains("特急") || v == "3" { return L.urgent }
         if v.contains("加急") || v == "2" { return L.rush }
-        return nil
+        return L.normal
     }
     private func urgencyColor(for label: String) -> Color {
         if label == L.urgent { return .red }
