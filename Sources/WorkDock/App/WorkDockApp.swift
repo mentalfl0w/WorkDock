@@ -9,7 +9,6 @@ struct WorkDockApp: App {
     private let log = Logger(subsystem: "cn.dylanliu.workdock", category: "App")
 
     init() {
-        // Register with LaunchServices so notification center can find our icon
         LSRegisterURL(Bundle.main.bundleURL as CFURL, false)
     }
 
@@ -20,7 +19,6 @@ struct WorkDockApp: App {
                     await container.bootstrap()
                     applyDockPolicy()
                 }
-                .background(WindowSizeObserver(router: container.router))
         }
         .defaultSize(width: 460, height: 520)
         .windowResizability(.automatic)
@@ -52,4 +50,3 @@ struct WorkDockApp: App {
 extension Notification.Name {
     static let openMainWindow = Notification.Name("cn.dylanliu.workdock.openMainWindow")
 }
-

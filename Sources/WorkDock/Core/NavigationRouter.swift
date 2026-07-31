@@ -12,7 +12,7 @@ import Combine
 public final class NavigationRouter: ObservableObject {
     @Published public var selectedModuleID: String?
     @Published public var pendingPayload: [String: String]?
-
+    var hasShownInitially = false
     private let log = Logger(subsystem: "cn.dylanliu.workdock", category: "Router")
 
     public init() {}
