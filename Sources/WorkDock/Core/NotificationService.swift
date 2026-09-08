@@ -3,6 +3,20 @@ import AppKit
 import UserNotifications
 import os
 
+/// UserNotifications permits deferred completion, but its callback lacks a
+/// `Sendable` annotation. One main-actor task owns each boxed callback.
+private final class DeferredNotificationCompletion: @unchecked Sendable {
+    private let handler: () -> Void
+
+    init(_ handler: @escaping () -> Void) {
+        self.handler = handler
+    }
+
+    func call() {
+        handler()
+    }
+}
+
 /// Routes notifications and menu clicks to their jump targets.
 ///
 /// Modules never touch ``UNUserNotificationCenter`` directly. They call
@@ -61,23 +75,26 @@ extension NotificationService: UNUserNotificationCenterDelegate {
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        defer { completionHandler() }
         guard let raw = response.notification.request.content.userInfo["target"] as? String,
               let target = Self.decode(raw) else {
             log.notice("notification click without target — ignoring")
+            completionHandler()
             return
         }
         log.info("notification click → \(String(describing: target), privacy: .public)")
+        let completion = DeferredNotificationCompletion(completionHandler)
         switch target {
         case .web(let url):
             Task { @MainActor in
+                defer { completion.call() }
                 NSWorkspace.shared.open(url)
             }
         case .route(let moduleID, let payload):
-            Task { @MainActor in
-                NSApp.activate(ignoringOtherApps: true)
-                router?.openMainWindow()
-                router?.navigate(moduleID: moduleID, payload: payload)
+            Task { @MainActor [weak self] in
+                defer { completion.call() }
+                guard let router = self?.router else { return }
+                router.navigate(moduleID: moduleID, payload: payload)
+                router.openMainWindow()
             }
         }
     }

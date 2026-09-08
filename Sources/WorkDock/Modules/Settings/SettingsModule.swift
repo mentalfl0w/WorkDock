@@ -26,8 +26,8 @@ public final class SettingsModule: Module {
     public func menuItems() async -> [ModuleMenuItem] {
         [.action(title: "\(L.settings)…", icon: "gearshape") { [weak self] in
             guard let self else { return }
-            self.router.openMainWindow()
             self.router.navigate(moduleID: self.id, payload: nil)
+            self.router.openMainWindow()
         }]
     }
 

@@ -3,11 +3,8 @@ import os
 import Combine
 /// Navigation bus shared by menu bar, main window, and notification clicks.
 ///
-/// ``openMainWindow()`` brings the app to front and requests the main window
-/// to open. Because the app is `LSUIElement`, `WindowGroup` does not pre-create
-/// a window — View-bound callers use `@Environment(\.openWindow)` directly;
-/// non-View callers (notification clicks) post ``.openMainWindow`` and the
-/// `WindowGroup` content observes it to activate the app.
+/// The main window is hidden with `NSWindow.orderOut(_:)`, rather than
+/// dismissed, so it remains available for notification and menu-bar routing.
 @MainActor
 public final class NavigationRouter: ObservableObject {
     @Published public var selectedModuleID: String?
@@ -17,14 +14,14 @@ public final class NavigationRouter: ObservableObject {
 
     public init() {}
 
-    /// Request the main window from a non-View context (notification click).
-    /// View contexts should use `@Environment(\.openWindow)` directly.
+    /// Bring the retained main window to the foreground.
     public func openMainWindow() {
         NSApp.activate(ignoringOtherApps: true)
-        for w in NSApp.windows where !w.title.isEmpty {
-            w.makeKeyAndOrderFront(nil)
+        guard let window = NSApp.windows.first(where: { $0.title == "WorkDock" }) else {
+            log.error("main window unavailable")
+            return
         }
-        NotificationCenter.default.post(name: .openMainWindow, object: nil)
+        window.makeKeyAndOrderFront(nil)
     }
 
     public func navigate(moduleID: String, payload: [String: String]? = nil) {

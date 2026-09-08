@@ -46,7 +46,3 @@ struct WorkDockApp: App {
         NSApp.setActivationPolicy(hide ? .accessory : .regular)
     }
 }
-
-extension Notification.Name {
-    static let openMainWindow = Notification.Name("cn.dylanliu.workdock.openMainWindow")
-}

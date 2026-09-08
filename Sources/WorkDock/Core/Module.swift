@@ -37,9 +37,8 @@ public protocol Module: AnyObject {
     /// Whether the module is authenticated and ready. Drives menu greying.
     var isSignedIn: Bool { get async }
     /// Framework-provided navigation bus, injected at construction. Modules
-    /// call `navigate(moduleID:payload:)` + `openMainWindow()` for **all**
-    /// "open X" actions (menu clicks, notification clicks, deep links) —
-    /// there is exactly one navigation path per app.
+    /// call `navigate(moduleID:payload:)`, then `openMainWindow()`, for all
+    /// "open X" actions (menu clicks, notification clicks, deep links).
     var router: NavigationRouter { get }
 
     // MARK: - Placement

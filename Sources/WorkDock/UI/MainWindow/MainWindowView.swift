@@ -8,7 +8,6 @@ import SwiftUI
 struct MainWindowView: View {
     @ObservedObject var registry: ModuleRegistry
     @ObservedObject var router: NavigationRouter
-    @Environment(\.dismissWindow) private var dismissWindow
 
     var body: some View {
         ZStack {
@@ -28,13 +27,7 @@ struct MainWindowView: View {
             }
         }
         .animation(.spring(duration: 0.3), value: router.selectedModuleID)
-        .task {
-            // On launch, only show menu bar — dismiss the window.
-            if router.selectedModuleID == nil && !router.hasShownInitially {
-                router.hasShownInitially = true
-                dismissWindow(id: "main")
-            }
-        }
+        .background(InitialWindowHider(router: router))
     }
 }
 

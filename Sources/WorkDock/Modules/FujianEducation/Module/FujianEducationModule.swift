@@ -330,14 +330,14 @@ public final class FujianEducationModule: Module, CredentialStore {
 
     @MainActor
     private func openMain(route: [String: String]) {
-        router.openMainWindow()
         router.navigate(moduleID: id, payload: route)
+        router.openMainWindow()
     }
 
     @MainActor
     private func openDetail(unid: String) {
-        router.openMainWindow()
         router.navigate(moduleID: id, payload: ["unid": unid])
+        router.openMainWindow()
     }
     // MARK: - Credential Store Routing
 
