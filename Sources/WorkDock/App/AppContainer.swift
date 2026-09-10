@@ -12,6 +12,9 @@ final class AppContainer: ObservableObject {
     let router = NavigationRouter()
     let notifications = NotificationService()
     let persistence = Persistence()
+    /// App-scoped proxy policy. Shared by the Settings module (edit surface)
+    /// and the FJJYT module (applies it to the live session).
+    let networkProxySettings = NetworkProxySettingsStore()
     lazy var registry: ModuleRegistry = ModuleRegistry(router: router)
 
     private let log = Logger(subsystem: "cn.dylanliu.workdock", category: "Container")
@@ -32,10 +35,21 @@ final class AppContainer: ObservableObject {
         let fjjyt = FujianEducationModule(
             router: router,
             persistence: persistence,
-            notifications: notifications
+            notifications: notifications,
+            networkProxySettings: networkProxySettings
         )
         registry.register(fjjyt)
-        registry.register(SettingsModule(router: router))
+        registry.register(SettingsModule(
+            router: router,
+            networkProxySettings: networkProxySettings,
+            onNetworkSettingsSaved: { [weak fjjyt] in
+                // Re-apply the (possibly new) proxy policy to the live FJJYT
+                // session. Absent a session, the policy simply applies to the
+                // next one built — still a success from the UI's perspective.
+                guard let fjjyt else { return true }
+                return await fjjyt.applyNetworkSettings()
+            }
+        ))
         registry.register(DemoModule(router: router))
     }
 }

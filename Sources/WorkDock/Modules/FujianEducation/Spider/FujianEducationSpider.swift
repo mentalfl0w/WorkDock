@@ -44,35 +44,35 @@ public actor FujianEducationSpider {
         isLoggedIn = false
         log.warning("session invalidated")
     }
+
+    /// Hard-closes the session: cancels in-flight work, invalidates the
+    /// underlying `URLSession` so no request can ever run under this spider's
+    /// proxy policy again, clears the cookie jar, and marks the spider logged
+    /// out. The instance must not be used afterwards — callers that need to
+    /// keep working must build a fresh spider first.
+    public func close() {
+        isLoggedIn = false
+        session.invalidateAndCancel()
+        cookieJar.clear()
+        log.info("session closed")
+    }
     public let username: String
 
     // MARK: - Init (two paths: password or persisted cookies)
 
-    public init(username: String, password: String) async throws {
+    public init(username: String, password: String, proxySettings: NetworkProxySettings) async throws {
         self.username = username
-        let config = URLSessionConfiguration.ephemeral
-        config.httpShouldSetCookies = false
-        config.httpCookieAcceptPolicy = .never
-        config.timeoutIntervalForRequest = 20
-        let delegate = RedirectCookieInterceptor { [cookieJar] name, value in
-            cookieJar.set(name, value)
-        }
-        self.session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
-        self.interceptor = delegate
+        let made = Self.makeSession(proxySettings: proxySettings, cookieJar: cookieJar)
+        self.session = made.session
+        self.interceptor = made.interceptor
         try await login(password: password)
     }
 
-    public init(username: String, cookies: [HTTPCookie]) async throws {
+    public init(username: String, cookies: [HTTPCookie], proxySettings: NetworkProxySettings) async throws {
         self.username = username
-        let config = URLSessionConfiguration.ephemeral
-        config.httpShouldSetCookies = false
-        config.httpCookieAcceptPolicy = .never
-        config.timeoutIntervalForRequest = 20
-        let delegate = RedirectCookieInterceptor { [cookieJar] name, value in
-            cookieJar.set(name, value)
-        }
-        self.session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
-        self.interceptor = delegate
+        let made = Self.makeSession(proxySettings: proxySettings, cookieJar: cookieJar)
+        self.session = made.session
+        self.interceptor = made.interceptor
         for c in cookies { cookieJar.set(c.name, c.value) }
         let profile = try await fetchUserProfile()
         guard !profile.userName.isEmpty else {
@@ -81,6 +81,28 @@ public actor FujianEducationSpider {
         }
         isLoggedIn = true
         log.info("cookie login ok for \(username, privacy: .public)")
+    }
+
+    // MARK: - Session setup
+
+    /// Builds the `URLSession` both initializers share, applying the given
+    /// proxy policy to its configuration before the session is created. A
+    /// session's configuration is immutable once created, so the policy is
+    /// baked in here — callers wanting a different policy must build a new
+    /// spider.
+    private static func makeSession(
+        proxySettings: NetworkProxySettings,
+        cookieJar: CookieBox
+    ) -> (session: URLSession, interceptor: RedirectCookieInterceptor) {
+        let config = URLSessionConfiguration.ephemeral
+        config.httpShouldSetCookies = false
+        config.httpCookieAcceptPolicy = .never
+        config.timeoutIntervalForRequest = 20
+        proxySettings.apply(to: config)
+        let delegate = RedirectCookieInterceptor { [cookieJar] name, value in
+            cookieJar.set(name, value)
+        }
+        return (URLSession(configuration: config, delegate: delegate, delegateQueue: nil), delegate)
     }
 
     // MARK: - Auth
@@ -476,6 +498,7 @@ private final class CookieBox: @unchecked Sendable {
     private let lock = OSAllocatedUnfairLock(initialState: [String: String]())
     func set(_ name: String, _ value: String) { lock.withLock { $0[name] = value } }
     func snapshot() -> [String: String] { lock.withLock { $0 } }
+    func clear() { lock.withLock { $0.removeAll() } }
     func header() -> String? {
         lock.withLock { jar in
             jar.isEmpty ? nil : jar.map { "\($0.key)=\($0.value)" }.joined(separator: "; ")

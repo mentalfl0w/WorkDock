@@ -18,6 +18,10 @@ public final class FujianEducationModule: Module, CredentialStore {
     private let persistence: Persistence
     public let router: NavigationRouter
     private let notifications: NotificationService
+    /// Shared proxy-policy store; every spider this module builds snapshots
+    /// the current policy from it, and `applyNetworkSettings()` cuts over the
+    /// live session when it changes.
+    private let networkProxySettings: NetworkProxySettingsStore
     private let log = Logger(subsystem: "cn.dylanliu.workdock.fjsjyt", category: "Module")
 
     private var spider: FujianEducationSpider?
@@ -38,10 +42,11 @@ public final class FujianEducationModule: Module, CredentialStore {
         return m > 0 ? m * 60 : 900
     }
 
-    public init(router: NavigationRouter, persistence: Persistence, notifications: NotificationService) {
+    public init(router: NavigationRouter, persistence: Persistence, notifications: NotificationService, networkProxySettings: NetworkProxySettingsStore) {
         self.router = router
         self.persistence = persistence
         self.notifications = notifications
+        self.networkProxySettings = networkProxySettings
     }
 
     public var isSignedIn: Bool {
@@ -136,7 +141,7 @@ public final class FujianEducationModule: Module, CredentialStore {
                 return
             }
             do {
-                spider = try await FujianEducationSpider(username: username, cookies: cookies)
+                spider = try await makeSpider(username: username, cookies: cookies)
                 log.info("restored session for \(username, privacy: .public)")
             } catch {
                 log.error("cookie restore failed, trying password: \(error.localizedDescription, privacy: .public)")
@@ -172,12 +177,86 @@ public final class FujianEducationModule: Module, CredentialStore {
         reminderTask?.cancel(); reminderTask = nil
     }
 
+    // MARK: - Proxy policy
+
+    /// Current policy from the shared (MainActor-isolated) settings store.
+    @MainActor
+    private func currentProxySettings() -> NetworkProxySettings {
+        networkProxySettings.settings
+    }
+
+    /// Builds a spider under the current proxy policy. Every spider
+    /// construction site in this module goes through one of these helpers so
+    /// no `URLSession` can ever be created with a stale policy.
+    private func makeSpider(username: String, password: String) async throws -> FujianEducationSpider {
+        try await FujianEducationSpider(
+            username: username,
+            password: password,
+            proxySettings: currentProxySettings())
+    }
+
+    private func makeSpider(username: String, cookies: [HTTPCookie]) async throws -> FujianEducationSpider {
+        try await FujianEducationSpider(
+            username: username,
+            cookies: cookies,
+            proxySettings: currentProxySettings())
+    }
+
+    /// Applies the persisted proxy policy to the live FJJYT session. Called
+    /// by the settings flow after the new policy has been saved.
+    ///
+    /// When a spider exists its cookies are snapshotted, the old session is
+    /// hard-closed (`close()` — no in-flight request can keep running under
+    /// the previous policy), and a fresh spider is rebuilt from those cookies
+    /// under the latest policy. The rebuilt spider replaces the old one only
+    /// after its profile validates — the cookie-restoring initializer throws
+    /// otherwise — so on failure the module is left with no session rather
+    /// than one running under the wrong policy.
+    ///
+    /// - Returns: `true` when the policy is active now or will apply to a
+    ///   future session; `false` when saving succeeded but rebuilding the
+    ///   active session failed after the hard close.
+    public func applyNetworkSettings() async -> Bool {
+        guard let old = spider else {
+            // No live session: the next login picks the policy up through the
+            // construction helpers.
+            return true
+        }
+        guard await old.isLoggedIn else {
+            // Stale/expired session: nothing active to rebuild. Close it so
+            // no request can ever run under the old policy; future sessions
+            // use the new policy.
+            await old.close()
+            spider = nil
+            return true
+        }
+        // Snapshot identity + cookies BEFORE closing, then rebuild under the
+        // latest policy. Log messages never include cookies or passwords.
+        guard let username = Creds.get(service: id, account: "username") else {
+            log.error("proxy change: no stored username to rebuild the session")
+            await old.close()
+            spider = nil
+            return false
+        }
+        let cookies = await old.cookies()
+        await old.close()
+        spider = nil
+        do {
+            spider = try await makeSpider(username: username, cookies: cookies)
+            log.info("proxy change: active FJJYT session rebuilt under new policy")
+            return true
+        } catch {
+            log.error("proxy change: session rebuild failed, signed out: \(error.localizedDescription, privacy: .public)")
+            return false
+        }
+    }
+
     /// Re-login with saved password to refresh cookies before they expire.
     private func refreshCookies() async {
         guard let username = Creds.get(service: id, account: "username"),
               let password = Creds.get(service: id, account: "password") else { return }
         do {
-            let s = try await FujianEducationSpider(username: username, password: password)
+            let s = try await makeSpider(username: username, password: password)
             spider = s
             let cookies = await s.cookies()
             let dicts: [[String: Any]] = cookies.map { c in
@@ -231,7 +310,7 @@ public final class FujianEducationModule: Module, CredentialStore {
             return
         }
         do {
-            spider = try await FujianEducationSpider(username: username, password: password)
+            spider = try await makeSpider(username: username, password: password)
             log.info("re-logged in with saved password for \(username, privacy: .public)")
         } catch {
             spider = nil
@@ -243,7 +322,7 @@ public final class FujianEducationModule: Module, CredentialStore {
 
     /// Password login (called from the login view).
     public func signIn(username: String, password: String, remember: Bool = true) async throws {
-        let s = try await FujianEducationSpider(username: username, password: password)
+        let s = try await makeSpider(username: username, password: password)
         self.spider = s
         let cookies = await s.cookies()
         let dicts: [[String: Any]] = cookies.map { c in
