@@ -17,7 +17,7 @@ public enum L {
 
     // MARK: - Settings
     public static let settings = isZh ? "设置" : "Settings"
-    public static let settingsSummary = isZh ? "Dock 显示、开机自启、关于。" : "Dock visibility, launch at login, about."
+    public static let settingsSummary = isZh ? "Dock 显示、开机自启、网络代理、关于。" : "Dock visibility, launch at login, network proxy, about."
     public static let general = isZh ? "通用" : "General"
     public static let showDockIcon = isZh ? "在 Dock 中显示图标" : "Show icon in Dock"
     public static let launchAtLogin = isZh ? "开机时自动启动" : "Launch at login"
@@ -103,4 +103,24 @@ public enum L {
     // MARK: - Credential Storage
     public static let useKeychain = isZh ? "使用钥匙串存储" : "Use Keychain Storage"
     public static let useKeychainDesc = isZh ? "更安全，但需要 Apple 开发者证书签名。当前使用文件存储。" : "More secure, requires Apple Developer certificate. Currently using file storage."
+
+    // MARK: - Network Proxy
+    public static let network = isZh ? "网络" : "Network"
+    public static let proxyMode = isZh ? "代理模式" : "Proxy Mode"
+    public static let proxyDirect = isZh ? "直接连接" : "Direct"
+    public static let proxySystem = isZh ? "系统代理" : "System"
+    public static let proxyCustom = isZh ? "自定义" : "Custom"
+    public static let proxyType = isZh ? "代理类型" : "Proxy Type"
+    public static let proxyTypeHTTP = isZh ? "HTTP/HTTPS" : "HTTP/HTTPS"
+    public static let proxyTypeSOCKS5 = isZh ? "SOCKS5" : "SOCKS5"
+    public static let proxyHost = isZh ? "代理主机" : "Proxy Host"
+    public static let proxyPort = isZh ? "端口" : "Port"
+    public static let proxyHostPlaceholder = isZh ? "例如 proxy.example.com" : "e.g. proxy.example.com"
+    public static let proxySaveApply = isZh ? "保存并应用" : "Save & Apply"
+    public static let proxyApplying = isZh ? "应用中…" : "Applying…"
+    public static let proxyHostRequired = isZh ? "请输入代理主机地址" : "Enter a proxy host address"
+    public static let proxyPortInvalid = isZh ? "端口需在 1–65535 之间" : "Port must be between 1 and 65535"
+    public static let proxyApplied = isZh ? "设置已保存，代理策略已生效。" : "Settings saved; the proxy policy is now in effect."
+    public static let proxyRebuildFailed = isZh ? "设置已保存，但活动会话重建失败（原会话已关闭）。" : "Settings saved, but the active session could not be rebuilt (it was closed)."
+    public static let proxySaveFailed = isZh ? "保存失败，请重试。" : "Save failed. Please try again."
 }
