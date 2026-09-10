@@ -22,5 +22,10 @@ let package = Package(
             path: "Sources/WorkDock",
             resources: [.process("Resources")]
         ),
+        .testTarget(
+            name: "WorkDockTests",
+            dependencies: ["WorkDock"],
+            path: "Tests/WorkDockTests"
+        ),
     ]
 )
