@@ -5,8 +5,12 @@ import os
 
 @main
 struct WorkDockApp: App {
-    @StateObject private var container = AppContainer()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     private let log = Logger(subsystem: "cn.dylanliu.workdock", category: "App")
+
+    /// The single app graph, owned by `AppDelegate` so bootstrap runs on a
+    /// launch hook instead of a view that is hidden at startup.
+    private var container: AppContainer { appDelegate.container }
 
     init() {
         LSRegisterURL(Bundle.main.bundleURL as CFURL, false)
@@ -15,10 +19,6 @@ struct WorkDockApp: App {
     var body: some Scene {
         Window("WorkDock", id: "main") {
             MainWindowView(registry: container.registry, router: container.router)
-                .task {
-                    await container.bootstrap()
-                    applyDockPolicy()
-                }
         }
         .defaultSize(width: 460, height: 520)
         .windowResizability(.automatic)
@@ -26,11 +26,10 @@ struct WorkDockApp: App {
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button(L.openApp) {
-                    NSApp.activate(ignoringOtherApps: true)
-                    for w in NSApp.windows where w.title == "WorkDock" {
-                        w.makeKeyAndOrderFront(nil)
-                        return
-                    }
+                    // One presentation path for every caller: the router
+                    // orders the window in, re-creates the scene when it was
+                    // dismissed, then activates the app.
+                    container.router.openMainWindow()
                 }
             }
         }
@@ -40,13 +39,4 @@ struct WorkDockApp: App {
         }
         .menuBarExtraStyle(.menu)
     }
-
-    private func applyDockPolicy() {
-        let hide = UserDefaults.standard.bool(forKey: "hideDockIcon")
-        NSApp.setActivationPolicy(hide ? .accessory : .regular)
-    }
-}
-
-extension Notification.Name {
-    static let openMainWindow = Notification.Name("cn.dylanliu.workdock.openMainWindow")
 }

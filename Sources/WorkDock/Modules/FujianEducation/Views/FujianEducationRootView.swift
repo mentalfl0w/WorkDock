@@ -4,7 +4,7 @@ import SwiftUI
 /// read, and search. The spider is owned by the module; this view reads
 /// through it, so all data calls are `async`.
 struct FujianEducationRootView: View {
-    let module: FujianEducationModule
+    @ObservedObject var module: FujianEducationModule
     @StateObject private var store = FujianEducationStore()
     @State private var signedIn = false
     @State private var showSettings = false
@@ -31,28 +31,22 @@ struct FujianEducationRootView: View {
             }
         }
         .task {
-            signedIn = await module.isSignedIn
-            if signedIn { await store.refresh(module: module) }
+            await syncSession()
+        }
+        .onChange(of: module.sessionGeneration) { _, _ in
+            // Cookie restore, password re-login, sign-in/out, refresh or a
+            // proxy rebuild can finish after this view appeared.
+            Task { await syncSession() }
         }
         .onChange(of: signedIn) { _, loggedIn in
             if loggedIn { Task { await store.refresh(module: module) } }
+            applyPendingRoute()
         }
         .onChange(of: store.tab) { _, tab in
             if tab == .read && store.read.isEmpty { Task { await store.loadRead(module: module) } }
         }
-        .onChange(of: router.pendingPayload) { _, payload in
-            guard let payload, signedIn else { return }
-            if let unid = payload["unid"] {
-                Task { await store.loadDetail(module: module, unid: unid) }
-            }
-            if let tab = payload["tab"] {
-                switch tab {
-                case "unread": store.tab = .unread
-                case "read": store.tab = .read
-                case "search": store.tab = .search
-                default: break
-                }
-            }
+        .onChange(of: router.pendingPayload) { _, _ in
+            applyPendingRoute()
         }
         .sheet(item: $store.detail) { d in
             ZStack {
@@ -70,6 +64,49 @@ struct FujianEducationRootView: View {
             }
             .presentationBackground(.clear)
             .presentationDragIndicator(.visible)
+        }
+    }
+
+    /// Re-reads the authoritative session state and finishes a pending deep
+    /// link.
+    ///
+    /// Called when the view appears and again on every session event. Silent
+    /// cookie restore and the password fallback both run a full round trip
+    /// after launch, so the value read at appearance time can be a stale
+    /// `false`: without this the user would stay on the login page while the
+    /// session was already live, and the clicked document would never open.
+    /// A restore that ends signed out keeps `signedIn == false`, so the login
+    /// form stays usable and the payload stays pending for a manual sign-in.
+    @MainActor
+    private func syncSession() async {
+        let generation = module.sessionGeneration
+        let currentSignedIn = await module.isSignedIn
+        guard generation == module.sessionGeneration else { return }
+        signedIn = currentSignedIn
+        applyPendingRoute()
+    }
+
+    /// Applies the router's pending deep link, if it targets this module.
+    ///
+    /// Runs on first appearance, after sign-in, and on payload changes — a
+    /// payload set before this view existed (notification click that had to
+    /// re-create the window, or a cold start) never produces a change event,
+    /// so a change-only path would drop the user on the module page without
+    /// the document they clicked. The router clears the payload on the first
+    /// successful take, so the three call sites cannot consume it twice.
+    @MainActor
+    private func applyPendingRoute() {
+        guard signedIn, let payload = router.takePendingPayload(moduleID: module.id) else { return }
+        if let unid = payload["unid"] {
+            Task { await store.loadDetail(module: module, unid: unid) }
+        }
+        if let tab = payload["tab"] {
+            switch tab {
+            case "unread": store.tab = .unread
+            case "read": store.tab = .read
+            case "search": store.tab = .search
+            default: break
+            }
         }
     }
 

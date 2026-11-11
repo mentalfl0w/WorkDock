@@ -9,11 +9,21 @@ import os
 /// file storage based on user preference); the last-seen UNID list lives in
 /// ``Persistence``. On new documents, it fires a ``NotificationService``
 /// notification whose click deep-links into the detail.
-public final class FujianEducationModule: Module, CredentialStore {
+public final class FujianEducationModule: Module, CredentialStore, ObservableObject {
     public let id = "fjsjyt"
     public let displayName = L.fjjytName
     public let icon = "doc.text.image"
     public let summary = L.fjjytSummary
+
+    /// Bumped whenever the session may have changed — silent cookie restore
+    /// finished, password re-login, sign-in, sign-out, cookie refresh, or a
+    /// proxy-policy rebuild.
+    ///
+    /// Views read ``isSignedIn`` for the truth; this only tells them to read it
+    /// again. Restoration runs a full round trip after launch, so a view that
+    /// appeared meanwhile would otherwise stay on the login page with a stale
+    /// `false` — and a deep link waiting for sign-in would never be applied.
+    @Published public private(set) var sessionGeneration = 0
 
     private let persistence: Persistence
     public let router: NavigationRouter
@@ -116,6 +126,12 @@ public final class FujianEducationModule: Module, CredentialStore {
         AnyView(FujianEducationRootView(module: self, router: router))
     }
 
+    /// Announces that the session may have changed, so views re-read
+    /// ``isSignedIn`` instead of trusting the value they captured earlier.
+    private func announceSessionChange() {
+        sessionGeneration &+= 1
+    }
+
     public func start() async {
         guard cookieRefreshTask == nil else { return }
         // Try silent restore from persisted cookies.
@@ -135,20 +151,23 @@ public final class FujianEducationModule: Module, CredentialStore {
                 }
                 return HTTPCookie(properties: p)
             }
-            guard !cookies.isEmpty else {
+            if cookies.isEmpty {
                 await tryPasswordLogin(username: username)
-                startTimers()
-                return
-            }
-            do {
-                spider = try await makeSpider(username: username, cookies: cookies)
-                log.info("restored session for \(username, privacy: .public)")
-            } catch {
-                log.error("cookie restore failed, trying password: \(error.localizedDescription, privacy: .public)")
-                await tryPasswordLogin(username: username)
+            } else {
+                do {
+                    spider = try await makeSpider(username: username, cookies: cookies)
+                    log.info("restored session for \(username, privacy: .public)")
+                } catch {
+                    log.error("cookie restore failed, trying password: \(error.localizedDescription, privacy: .public)")
+                    await tryPasswordLogin(username: username)
+                }
             }
         }
         startTimers()
+        // Restoration is a full round trip. Announce the settled state — even
+        // when it ended signed out — so a view that appeared while it ran
+        // re-reads `isSignedIn` instead of staying on the login page.
+        announceSessionChange()
     }
 
     private func startTimers() {
@@ -228,6 +247,7 @@ public final class FujianEducationModule: Module, CredentialStore {
             // use the new policy.
             await old.close()
             spider = nil
+            announceSessionChange()
             return true
         }
         // Snapshot identity + cookies BEFORE closing, then rebuild under the
@@ -236,6 +256,7 @@ public final class FujianEducationModule: Module, CredentialStore {
             log.error("proxy change: no stored username to rebuild the session")
             await old.close()
             spider = nil
+            announceSessionChange()
             return false
         }
         let cookies = await old.cookies()
@@ -244,9 +265,11 @@ public final class FujianEducationModule: Module, CredentialStore {
         do {
             spider = try await makeSpider(username: username, cookies: cookies)
             log.info("proxy change: active FJJYT session rebuilt under new policy")
+            announceSessionChange()
             return true
         } catch {
             log.error("proxy change: session rebuild failed, signed out: \(error.localizedDescription, privacy: .public)")
+            announceSessionChange()
             return false
         }
     }
@@ -267,6 +290,7 @@ public final class FujianEducationModule: Module, CredentialStore {
             let data = try JSONSerialization.data(withJSONObject: dicts)
             Creds.set(service: id, account: "cookies", value: String(data: data, encoding: .utf8) ?? "")
             log.info("cookie refreshed for \(username, privacy: .public)")
+            announceSessionChange()
         } catch {
             log.error("cookie refresh failed: \(error.localizedDescription, privacy: .public)")
         }
@@ -343,12 +367,14 @@ public final class FujianEducationModule: Module, CredentialStore {
             Creds.delete(service: id, account: "password")
         }
         Creds.set(service: id, account: "cookies", value: String(data: data, encoding: .utf8) ?? "")
+        announceSessionChange()
     }
 
     public func signOut() {
         spider = nil
         Creds.delete(service: id, account: "password")
         Creds.delete(service: id, account: "cookies")
+        announceSessionChange()
     }
 
     // MARK: - CredentialStore

@@ -8,7 +8,7 @@ import SwiftUI
 struct MainWindowView: View {
     @ObservedObject var registry: ModuleRegistry
     @ObservedObject var router: NavigationRouter
-    @Environment(\.dismissWindow) private var dismissWindow
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         ZStack {
@@ -28,12 +28,18 @@ struct MainWindowView: View {
             }
         }
         .animation(.spring(duration: 0.3), value: router.selectedModuleID)
-        .task {
-            // On launch, only show menu bar — dismiss the window.
-            if router.selectedModuleID == nil && !router.hasShownInitially {
-                router.hasShownInitially = true
-                dismissWindow(id: "main")
-            }
+        // Gives the router this scene's window, and the router answers by
+        // presenting it the moment a click is waiting for it.
+        .background(WindowReporter { window in
+            router.mainWindowChanged(window)
+        })
+        .onAppear {
+            // Needed for the case where the user closed the window: only this
+            // stashed action can rebuild the scene.
+            router.registerMainWindowOpener(openWindow)
+            // Menu-bar-only startup: the router hides this window unless a
+            // click is already waiting for it.
+            router.mainWindowAppeared()
         }
     }
 }

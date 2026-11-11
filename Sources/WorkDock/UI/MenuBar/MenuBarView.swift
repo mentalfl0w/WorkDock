@@ -18,11 +18,10 @@ struct MenuBarView: View {
             }
             Divider()
             Button(L.openApp) {
-                openWindow(id: "main")
-                NSApp.activate(ignoringOtherApps: true)
-                for w in NSApp.windows where !w.title.isEmpty {
-                    w.makeKeyAndOrderFront(nil)
-                }
+                // Same path as notification clicks: order the window in, then
+                // activate. `openWindow` alone leaves the app behind other
+                // windows when the scene had to be re-created.
+                router.openMainWindow()
             }
             .keyboardShortcut("o")
 
@@ -31,6 +30,10 @@ struct MenuBarView: View {
             }
             .keyboardShortcut("q")
         }
+        // The dropdown is a live view whenever the user opens it: refresh the
+        // router's opener here too, so a launch that never presented the main
+        // window still gains a valid way to open it.
+        .onAppear { router.registerMainWindowOpener(openWindow) }
     }
 }
 

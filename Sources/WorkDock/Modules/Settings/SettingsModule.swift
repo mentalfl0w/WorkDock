@@ -83,7 +83,7 @@ struct SettingsModuleView: View {
     private let store: NetworkProxySettingsStore
     private let onNetworkSettingsSaved: () async -> Bool
 
-    @AppStorage("hideDockIcon") private var hideDockIcon = false
+    @AppStorage(DockVisibility.hideKey) private var hideDockIcon = false
     @State private var launchAtLogin = false
     private let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
     private let author = "Dylan Liu"
@@ -113,7 +113,7 @@ struct SettingsModuleView: View {
                         get: { !hideDockIcon },
                         set: { show in
                             hideDockIcon = !show
-                            NSApp.setActivationPolicy(show ? .regular : .accessory)
+                            DockVisibility.applyCurrentPreference()
                             NSApp.activate(ignoringOtherApps: true)
                             for window in NSApp.windows where !window.title.isEmpty {
                                 window.makeKeyAndOrderFront(nil)

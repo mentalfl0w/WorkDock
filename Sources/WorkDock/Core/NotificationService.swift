@@ -9,7 +9,9 @@ import os
 /// ``notify(title:body:target:)``; this service embeds the ``JumpTarget`` in
 /// the request's `userInfo` and, on click, dispatches it — opening a browser
 /// for ``JumpTarget.web`` or handing a ``JumpTarget.route`` to the
-/// ``NavigationRouter`` after bringing the app to front.
+/// ``NavigationRouter``, which routes the click and brings the main window
+/// forward (re-creating it when the menu-bar-only startup already dismissed
+/// it).
 public final class NotificationService: NSObject, @unchecked Sendable {
     private let log = Logger(subsystem: "cn.dylanliu.workdock", category: "Notification")
     private var center: UNUserNotificationCenter { UNUserNotificationCenter.current() }
@@ -75,9 +77,14 @@ extension NotificationService: UNUserNotificationCenterDelegate {
             }
         case .route(let moduleID, let payload):
             Task { @MainActor in
-                NSApp.activate(ignoringOtherApps: true)
-                router?.openMainWindow()
+                // Route first: when the scene has to be re-created, the fresh
+                // window then renders the target module directly instead of
+                // flashing the gallery. Presentation owns the sequencing —
+                // it orders the window in *before* activating the app,
+                // because activating an app with no window on screen is
+                // dropped by the window server.
                 router?.navigate(moduleID: moduleID, payload: payload)
+                router?.openMainWindow()
             }
         }
     }
