@@ -15,6 +15,7 @@ final class AppContainer: ObservableObject {
     /// App-scoped proxy policy. Shared by the Settings module (edit surface)
     /// and the FJJYT module (applies it to the live session).
     let networkProxySettings = NetworkProxySettingsStore()
+    let hotkeys = HotkeySettingsStore()
     lazy var registry: ModuleRegistry = ModuleRegistry(router: router)
 
     private let log = Logger(subsystem: "cn.dylanliu.workdock", category: "Container")
@@ -26,10 +27,23 @@ final class AppContainer: ObservableObject {
 
     private var bootstrapped = false
 
+    /// Registers modules and asks for notification authorization.
+    ///
+    /// Driven by `AppDelegate.applicationDidFinishLaunching`, not by a view:
+    /// the main window is only hidden at startup, and a launch that goes
+    /// straight into a notification click must still have every module wired
+    /// before the click is routed. Re-entry is a no-op.
     func bootstrap() async {
         guard !bootstrapped else { return }
         bootstrapped = true
+        // Wiring first: a notification click can land while the authorization
+        // prompt is still on screen, and the module it routes to must already
+        // be registered by then.
+        registerModules()
         await notifications.requestAuthorization()
+    }
+
+    private func registerModules() {
         // Modules register here. FujianEducation is the first; future modules
         // append in display order.
         let fjjyt = FujianEducationModule(
@@ -39,6 +53,14 @@ final class AppContainer: ObservableObject {
             networkProxySettings: networkProxySettings
         )
         registry.register(fjjyt)
+        let ocr = OCRModule(router: router)
+        hotkeys.bind { [weak ocr] in
+            ocr?.triggerScreenshot()
+        }
+        ocr.setShortcutSettingsView {
+            HotkeySettingsView(store: hotkeys)
+        }
+        registry.register(ocr)
         registry.register(SettingsModule(
             router: router,
             networkProxySettings: networkProxySettings,

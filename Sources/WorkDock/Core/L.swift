@@ -123,4 +123,61 @@ public enum L {
     public static let proxyApplied = isZh ? "设置已保存，代理策略已生效。" : "Settings saved; the proxy policy is now in effect."
     public static let proxyRebuildFailed = isZh ? "设置已保存，但活动会话重建失败（原会话已关闭）。" : "Settings saved, but the active session could not be rebuilt (it was closed)."
     public static let proxySaveFailed = isZh ? "保存失败，请重试。" : "Save failed. Please try again."
+
+    // MARK: - OCR Module
+    public static let ocrName = isZh ? "截图识字" : "Screenshot OCR"
+    public static let ocrSummary = isZh ? "本地中英文 OCR：框选截图、剪贴板或图片文件。" : "Local Chinese/English OCR from a screen region, clipboard, or file."
+    public static let ocrScreenshot = isZh ? "截图" : "Screenshot"
+    public static let ocrClipboard = isZh ? "剪贴板" : "Clipboard"
+    public static let ocrChooseImage = isZh ? "图片…" : "Image…"
+    public static let ocrChooseImageTitle = isZh ? "选择图片" : "Choose an Image"
+    public static let ocrOpen = isZh ? "打开" : "Open"
+    public static let ocrOpenPanel = isZh ? "打开识别窗口" : "Open OCR Window"
+    public static let ocrOpenModule = isZh ? "在模块中打开" : "Open in Module"
+    public static let ocrCancel = isZh ? "取消识别" : "Cancel"
+    public static let ocrWorking = isZh ? "处理中" : "Working"
+    public static let ocrCapturing = isZh ? "等待框选区域…（Esc 取消）" : "Select a region… (Esc to cancel)"
+    public static let ocrRecognizing = isZh ? "正在识别…" : "Recognizing…"
+    public static let ocrIdle = isZh ? "截图、粘贴或选择图片开始识别" : "Capture, paste, or choose an image to start."
+    public static let ocrDone = isZh ? "识别完成" : "Done"
+    public static let ocrCancelled = isZh ? "已取消" : "Cancelled"
+    public static let ocrCopy = isZh ? "复制文本" : "Copy Text"
+    public static let ocrCopied = isZh ? "已复制" : "Copied"
+    public static let ocrPlaceholder = isZh ? "识别出的文字会显示在这里，可自行编辑。" : "Recognized text appears here and can be edited."
+    public static let ocrShortcuts = isZh ? "快捷键" : "Shortcuts"
+    public static let ocrShortcutHint = isZh ? "由快捷键管理器接入后显示" : "Provided by the hotkey manager."
+    public static let ocrLocalOnly = isZh ? "全部识别均在本机完成，不联网，结果不会保存。" : "All recognition runs locally, offline. Results are never saved."
+    public static let ocrPermissionTitle = isZh ? "需要屏幕录制权限" : "Screen Recording required"
+    public static let ocrPermissionBody = isZh ? "框选截图需要“屏幕录制”权限。请在系统设置中为 WorkDock 开启；若已开启仍失败，请重启 WorkDock。" : "Capturing a region needs Screen Recording access. Enable it for WorkDock in System Settings; restart WorkDock if it still fails."
+    public static let ocrOpenSettings = isZh ? "打开系统设置" : "Open Settings"
+    public static let ocrRetry = isZh ? "重试" : "Try Again"
+    public static let ocrClipboardEmpty = isZh ? "剪贴板里没有图片。" : "The clipboard has no image."
+    public static let ocrImageInvalid = isZh ? "无法解码这张图片。" : "This image could not be decoded."
+    public static let ocrNoText = isZh ? "未识别到文字。" : "No text was found."
+    public static let ocrCaptureBusy = isZh ? "已有截图正在进行。" : "A capture is already running."
+    public static let ocrScreenSource = isZh ? "截图" : "Screen"
+    public static let ocrClipboardSource = isZh ? "剪贴板" : "Clipboard"
+    public static let ocrFileSource = isZh ? "图片" : "Image"
+
+    public static func ocrImageUnreadable(_ name: String) -> String {
+        isZh ? "无法读取“\(name)”。" : "Could not read “\(name)”."
+    }
+    public static func ocrRecognitionFailed(_ reason: String) -> String {
+        isZh ? "识别失败：\(reason)" : "Recognition failed: \(reason)"
+    }
+    public static func ocrCaptureFailed(_ reason: String) -> String {
+        isZh ? "无法截图：\(reason)" : "Capture failed: \(reason)"
+    }
+    public static func ocrConfidence(_ percent: Int) -> String {
+        isZh ? "置信度 \(percent)%" : "Confidence \(percent)%"
+    }
+    public static func ocrLineCount(_ count: Int) -> String {
+        isZh ? "\(count) 行" : "\(count) lines"
+    }
+    public static func ocrPixelSize(_ width: Int, _ height: Int) -> String {
+        "\(width)×\(height)"
+    }
+    public static func ocrDuration(_ seconds: Double) -> String {
+        isZh ? String(format: "%.2f 秒", seconds) : String(format: "%.2f s", seconds)
+    }
 }
