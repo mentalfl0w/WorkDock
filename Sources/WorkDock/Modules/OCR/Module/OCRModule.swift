@@ -25,6 +25,12 @@ enum OCRModuleError: LocalizedError {
 /// stays in memory only; WorkDock never writes recognition results to disk.
 /// Nothing leaves the machine.
 ///
+/// Every visible outcome — progress, a result, an error, or the Screen
+/// Recording guidance — is shown on this module's page in the main window.
+/// There is no separate result window, so a hotkey run and a run started from
+/// the page always end in the same place, and the framework keeps exactly one
+/// navigation path.
+///
 /// Hotkeys are owned by the app's separate hotkey manager: it retrieves this
 /// module from ``ModuleRegistry`` and calls ``triggerScreenshot()``. The
 /// settings UI is injected through ``shortcutSettingsView`` /
@@ -50,7 +56,13 @@ public final class OCRModule: ObservableObject, Module {
     private let log = Logger(subsystem: "cn.dylanliu.workdock.ocr", category: "Module")
     private var activeTask: Task<Void, Never>?
     private var captureService: ScreenCaptureService?
-    private lazy var resultPanel = OCRResultPanelController(module: self)
+
+    /// WorkDock windows ordered out for the duration of an interactive
+    /// capture, so the window is never part of its own screenshot. Each entry
+    /// remembers whether it was key, which lets an Esc cancel drop the user
+    /// back exactly where they were.
+    private var windowsHiddenForCapture: [(window: NSWindow, wasKey: Bool)] = []
+    private var appWasActiveBeforeCapture = false
 
     /// - Parameter router: Framework navigation bus.
     public init(router: NavigationRouter) {
@@ -77,7 +89,7 @@ public final class OCRModule: ObservableObject, Module {
             },
             .separator,
             .action(title: L.ocrOpenPanel, icon: "macwindow") { [weak self] in
-                self?.presentResultPanel()
+                self?.showInMainWindow()
             }
         ]
     }
@@ -92,7 +104,8 @@ public final class OCRModule: ObservableObject, Module {
 
     public func stop() async {
         cancelActiveWork()
-        resultPanel.close()
+        // A capture cancelled by shutdown may never reach its own cleanup.
+        restoreWindowsHiddenForCapture()
     }
 
     // MARK: - Trigger API (main-thread callable)
@@ -101,9 +114,9 @@ public final class OCRModule: ObservableObject, Module {
     ///
     /// This is the public entry point for the menu bar, the module page, and
     /// the external hotkey manager. It is main-actor isolated, returns
-    /// immediately, and publishes progress through ``store`` plus the floating
-    /// result panel. While a run is in flight a new trigger is ignored rather
-    /// than queued.
+    /// immediately, and publishes progress through ``store``; the outcome is
+    /// shown on the OCR page. While a run is in flight a new trigger is
+    /// ignored rather than queued.
     public func triggerScreenshot() {
         guard activeTask == nil else {
             handleBusyTrigger()
@@ -111,11 +124,10 @@ public final class OCRModule: ObservableObject, Module {
         }
         guard ensureScreenRecordingPermission() else {
             store.requirePermission()
-            presentResultPanel()
+            showInMainWindow()
             log.notice("screenshot blocked: screen recording permission missing")
             return
         }
-        resultPanel.close()
         start(input: .screen)
     }
 
@@ -153,18 +165,15 @@ public final class OCRModule: ObservableObject, Module {
         activeTask?.cancel()
     }
 
-    /// Shows the floating result/editor panel, creating it on first use and
-    /// reusing it afterwards.
-    public func presentResultPanel() {
-        activateForDialog()
-        resultPanel.show()
-    }
-
-    /// Deep-links into this module's full page (settings and hotkey slot)
-    /// through the framework's single navigation path.
+    /// Brings the OCR page in the main window forward — the single place where
+    /// progress, results, errors, and permission guidance appear.
+    ///
+    /// Navigation happens before the window request on purpose: a click can
+    /// arrive while the scene is gone, and the rebuilt window then lands on
+    /// this module instead of the gallery.
     public func showInMainWindow() {
-        router.openMainWindow()
         router.navigate(moduleID: id)
+        router.openMainWindow()
     }
 
     /// Injects the hotkey manager's settings view into the OCR page.
@@ -188,11 +197,11 @@ public final class OCRModule: ObservableObject, Module {
     // MARK: - Pipeline
 
     /// A second trigger never starts a parallel capture or Vision pass. While
-    /// the system selection UI is open the panel stays hidden so it cannot
-    /// cover the crosshair; otherwise the existing progress is brought forward.
+    /// the system selection UI is open nothing is raised, so the crosshair
+    /// stays unobstructed; otherwise the running progress is brought forward.
     private func handleBusyTrigger() {
         guard store.phase != .capturing else { return }
-        presentResultPanel()
+        showInMainWindow()
     }
 
     private enum Input {
@@ -224,9 +233,7 @@ public final class OCRModule: ObservableObject, Module {
             let data: Data
             switch input {
             case .screen:
-                let service = ScreenCaptureService()
-                captureService = service
-                data = try await service.captureRegion()
+                data = try await captureScreen()
             case .clipboard:
                 data = try readClipboardImage()
             case .file(let url):
@@ -236,10 +243,13 @@ public final class OCRModule: ObservableObject, Module {
             try Task.checkCancellation()
             store.attach(image: data)
             store.markRecognizing()
-            presentResultPanel()
+            showInMainWindow()
 
             let result = try await recognizer.recognize(imageData: data)
             try Task.checkCancellation()
+            // The page already shows the result through `store`; presenting
+            // again here would pull focus back if the user switched apps
+            // while recognition ran.
             store.finish(result, image: data, source: input.source)
             log.info("ocr finished: \(result.lineCount, privacy: .public) lines")
         } catch is CancellationError {
@@ -248,18 +258,29 @@ public final class OCRModule: ObservableObject, Module {
         } catch let error as ScreenCaptureError {
             if case .cancelled = error {
                 // Esc in the system selection UI is a normal outcome, not an
-                // error banner.
+                // error banner, and it must not pull a window forward.
                 store.markCancelled()
             } else {
                 store.fail(error.localizedDescription)
-                presentResultPanel()
+                showInMainWindow()
                 log.error("screen capture failed: \(error.localizedDescription, privacy: .public)")
             }
         } catch {
             store.fail(error.localizedDescription)
-            presentResultPanel()
+            showInMainWindow()
             log.error("ocr failed: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    /// Captures one interactive region while WorkDock's own windows are out of
+    /// the way, and puts them back exactly as they were when the selection UI
+    /// ends — by result, by error, or by Esc.
+    private func captureScreen() async throws -> Data {
+        hideWorkDockWindowsForCapture()
+        defer { restoreWindowsHiddenForCapture() }
+        let service = ScreenCaptureService()
+        captureService = service
+        return try await service.captureRegion()
     }
 
     // MARK: - Inputs
@@ -293,6 +314,54 @@ public final class OCRModule: ObservableObject, Module {
             throw OCRModuleError.imageUnreadable(url.lastPathComponent)
         }
         return data
+    }
+
+    // MARK: - Capture window occlusion
+
+    /// Orders WorkDock's own content windows out before the system selection
+    /// UI opens, so the app can never end up inside its own screenshot.
+    ///
+    /// Only windows this app owns are reachable from `NSApp.windows`, so the
+    /// user's other windows and other apps are untouched. Menu, status-item,
+    /// popover, and tooltip windows stay put: they are not key-capable
+    /// normal-level windows, and ordering them out would disturb AppKit's own
+    /// lifecycle.
+    private func hideWorkDockWindowsForCapture() {
+        guard windowsHiddenForCapture.isEmpty else { return }
+        appWasActiveBeforeCapture = NSApp.isActive
+        for window in NSApp.windows {
+            guard window.isVisible, window.level == .normal, window.canBecomeKey else { continue }
+            windowsHiddenForCapture.append((window: window, wasKey: window.isKeyWindow))
+            window.orderOut(nil)
+        }
+        log.notice("hid \(self.windowsHiddenForCapture.count, privacy: .public) window(s) for capture")
+    }
+
+    /// Puts the windows hidden for a capture back, leaving focus where the
+    /// user left it.
+    ///
+    /// When WorkDock was active before the capture, the window that was key
+    /// becomes key again — this is the Esc-cancel path back to the page. A
+    /// capture started while WorkDock was in the background restores the same
+    /// windows without activating the app or stealing focus from whatever the
+    /// user is doing.
+    private func restoreWindowsHiddenForCapture() {
+        let hidden = windowsHiddenForCapture
+        let wasActive = appWasActiveBeforeCapture
+        windowsHiddenForCapture.removeAll()
+        appWasActiveBeforeCapture = false
+        guard !hidden.isEmpty else { return }
+
+        for entry in hidden {
+            if wasActive, entry.wasKey {
+                entry.window.makeKeyAndOrderFront(nil)
+            } else {
+                entry.window.orderFront(nil)
+            }
+        }
+        if wasActive {
+            activateForDialog()
+        }
     }
 
     // MARK: - Permissions

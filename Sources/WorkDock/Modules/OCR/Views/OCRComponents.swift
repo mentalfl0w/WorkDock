@@ -1,50 +1,88 @@
+import Foundation
 import SwiftUI
 
-/// Shared input row for the module page and the floating result panel.
+/// Input row for the OCR page.
+///
+/// The action row is the page's action layer: system buttons with the Liquid
+/// Glass button style, laid out adaptively. It keeps the three inputs always
+/// visible and adds **Cancel** only while a run is in flight, so every entry
+/// point stays reachable at any window width.
 struct OCRActionRow: View {
     @ObservedObject var module: OCRModule
     @ObservedObject var store: OCRStore
 
     var body: some View {
-        Group {
-            if store.isBusy {
+        ViewThatFits(in: .horizontal) {
+            // Wide: one row with the actions left and Cancel trailing.
+            HStack(spacing: 8) {
+                screenshotButton
+                clipboardButton
+                imageButton
+                cancelButton
+                Spacer(minLength: 4)
+            }
+
+            // Narrow: two rows, labels preserved instead of truncated.
+            VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text(L.ocrWorking)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Spacer(minLength: 4)
-                    Button(L.ocrCancel) {
-                        module.cancelActiveWork()
-                    }
+                    screenshotButton
+                    clipboardButton
+                    Spacer(minLength: 0)
                 }
-            } else {
                 HStack(spacing: 8) {
-                    Button {
-                        module.triggerScreenshot()
-                    } label: {
-                        Label(L.ocrScreenshot, systemImage: "text.viewfinder")
-                    }
-
-                    Button {
-                        module.triggerClipboardOCR()
-                    } label: {
-                        Label(L.ocrClipboard, systemImage: "doc.on.clipboard")
-                    }
-
-                    Button {
-                        module.chooseImageAndRecognize()
-                    } label: {
-                        Label(L.ocrChooseImage, systemImage: "photo")
-                    }
-
-                    Spacer(minLength: 4)
+                    imageButton
+                    cancelButton
+                    Spacer(minLength: 0)
                 }
             }
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.glass)
         .controlSize(.small)
+    }
+
+    private var screenshotButton: some View {
+        Button {
+            module.triggerScreenshot()
+        } label: {
+            Label(L.ocrScreenshot, systemImage: "text.viewfinder")
+        }
+        .help(L.ocrScreenshot)
+        .disabled(store.isBusy)
+        .guiSmokeIdentified(GUISmokeID.ocrScreenshotAction)
+    }
+
+    private var clipboardButton: some View {
+        Button {
+            module.triggerClipboardOCR()
+        } label: {
+            Label(L.ocrClipboard, systemImage: "doc.on.clipboard")
+        }
+        .help(L.ocrClipboard)
+        .disabled(store.isBusy)
+        .guiSmokeIdentified(GUISmokeID.ocrClipboardAction)
+    }
+
+    private var imageButton: some View {
+        Button {
+            module.chooseImageAndRecognize()
+        } label: {
+            Label(L.ocrChooseImage, systemImage: "photo")
+        }
+        .help(L.ocrChooseImage)
+        .disabled(store.isBusy)
+        .guiSmokeIdentified(GUISmokeID.ocrImageFileAction)
+    }
+
+    @ViewBuilder
+    private var cancelButton: some View {
+        if store.isBusy {
+            Button {
+                module.cancelActiveWork()
+            } label: {
+                Label(L.ocrCancel, systemImage: "xmark")
+            }
+            .help(L.ocrCancel)
+        }
     }
 }
 
@@ -101,9 +139,14 @@ struct OCRMessageBanner: View {
 }
 
 /// Editable recognition result plus copy action and run statistics.
+///
+/// This is the page's content layer: an opaque-enough text surface (no glass),
+/// so recognised text stays readable over the window material.
 struct OCREditorView: View {
     @ObservedObject var store: OCRStore
-    var minHeight: CGFloat = 180
+    /// Total height (text surface + footer), decided by the page so the editor
+    /// can absorb the window's free space or stop at a comfortable minimum.
+    var height: CGFloat
 
     var body: some View {
         VStack(spacing: 8) {
@@ -112,6 +155,7 @@ struct OCREditorView: View {
                     .font(.system(size: 13))
                     .scrollContentBackground(.hidden)
                     .padding(6)
+                    .guiSmokeIdentified(GUISmokeID.ocrEditor)
                 if store.text.isEmpty {
                     Text(L.ocrPlaceholder)
                         .font(.system(size: 12))
@@ -121,9 +165,9 @@ struct OCREditorView: View {
                         .allowsHitTesting(false)
                 }
             }
-            .frame(minHeight: minHeight)
+            .frame(maxHeight: .infinity)
             .background(
-                Color(nsColor: .textBackgroundColor).opacity(0.4),
+                Color(nsColor: .textBackgroundColor).opacity(0.65),
                 in: RoundedRectangle(cornerRadius: 8))
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
@@ -131,6 +175,8 @@ struct OCREditorView: View {
 
             footer
         }
+        .frame(maxWidth: .infinity)
+        .frame(height: height)
     }
 
     private var footer: some View {
@@ -155,6 +201,7 @@ struct OCREditorView: View {
             }
             .controlSize(.small)
             .disabled(store.text.isEmpty)
+            .help(L.ocrCopy)
         }
     }
 
@@ -168,20 +215,61 @@ struct OCREditorView: View {
     }
 }
 
-/// Compact one-line status used by the module page and the result panel.
+/// Compact one-line status for the OCR page.
+///
+/// A run can take several seconds, so the busy state is not a static label:
+/// it adds a spinner and a live elapsed counter, which shows the run is still
+/// progressing and keeps **Cancel** (in `OCRActionRow`) the obvious exit. No
+/// prewarming happens here — the module only runs when the user asks.
 struct OCRStatusRow: View {
     @ObservedObject var store: OCRStore
+    /// When the current run was noticed as busy; `nil` outside a run.
+    var busySince: Date? = nil
 
     var body: some View {
         HStack(spacing: 6) {
-            Text(store.phase.label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if store.isBusy {
+                ProgressView()
+                    .controlSize(.mini)
+                Text(store.phase.label)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                if let busySince {
+                    TimelineView(.periodic(from: busySince, by: 0.5)) { context in
+                        Text(elapsedText(since: busySince, now: context.date))
+                            .font(.caption2)
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else {
+                Text(store.phase.label)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
             Spacer(minLength: 4)
-            Text(store.lastSource.label)
+            Label(store.lastSource.label, systemImage: store.lastSource.icon)
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
+                .lineLimit(1)
         }
+        .padding(.horizontal, store.isBusy ? 8 : 0)
+        .padding(.vertical, store.isBusy ? 6 : 0)
+        .background {
+            if store.isBusy {
+                RoundedRectangle(cornerRadius: 7)
+                    .fill(Color.accentColor.opacity(0.10))
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: store.isBusy)
+        .animation(.easeInOut(duration: 0.15), value: store.phase)
+    }
+
+    private func elapsedText(since start: Date, now: Date) -> String {
+        let seconds = max(0, Int(now.timeIntervalSince(start).rounded(.down)))
+        return "\(seconds)s"
     }
 }
 

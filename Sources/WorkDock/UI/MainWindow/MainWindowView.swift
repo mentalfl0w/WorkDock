@@ -2,9 +2,12 @@ import SwiftUI
 
 /// Main window: content-driven size, switches between gallery and module.
 ///
-/// - No module selected: compact card gallery (~720×480).
-/// - Module selected: module's `mainView()` fills a wider window (~900×600).
-/// Window size follows content via `.windowResizability(.contentSize)`.
+/// - No module selected: card gallery, scrollable from 360×320 up.
+/// - Module selected: module's `mainView()` fills the window from 360×320 up.
+///
+/// The window may not shrink below the current content's minimum size
+/// (`.windowResizability(.contentMinSize)` in `WorkDockApp`); module pages
+/// scroll inside that minimum, so content never becomes unreachable.
 struct MainWindowView: View {
     @ObservedObject var registry: ModuleRegistry
     @ObservedObject var router: NavigationRouter
@@ -75,7 +78,7 @@ struct ModuleGallery: View {
                 .padding(.bottom, 32)
             }
         }
-        .frame(minWidth: 420, idealWidth: 460, minHeight: 420)
+        .frame(minWidth: 360, idealWidth: 460, minHeight: 320)
     }
 
     private var header: some View {
@@ -145,8 +148,12 @@ struct ModuleHostView: View {
     @ObservedObject var router: NavigationRouter
 
     var body: some View {
+        // Minimums are deliberately small: module pages own their scrolling,
+        // so the window may shrink while every control stays reachable. They
+        // match the gallery's floor so switching views never resizes the
+        // window behind the user's back.
         module.mainView()
-            .frame(minWidth: 480, idealWidth: 600, maxWidth: .infinity, minHeight: 400, idealHeight: 540, maxHeight: .infinity)
+            .frame(minWidth: 360, idealWidth: 600, maxWidth: .infinity, minHeight: 320, idealHeight: 540, maxHeight: .infinity)
             .environment(\.moduleBackAction, {
                 Task { @MainActor in
                     withAnimation(.spring(duration: 0.3)) {

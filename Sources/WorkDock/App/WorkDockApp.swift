@@ -13,6 +13,9 @@ struct WorkDockApp: App {
     private var container: AppContainer { appDelegate.container }
 
     init() {
+        // Registering the bundle with LaunchServices is a system-wide side
+        // effect; a throwaway smoke bundle must not leave one behind.
+        guard !GUISmoke.isEnabled else { return }
         LSRegisterURL(Bundle.main.bundleURL as CFURL, false)
     }
 
@@ -21,7 +24,7 @@ struct WorkDockApp: App {
             MainWindowView(registry: container.registry, router: container.router)
         }
         .defaultSize(width: 460, height: 520)
-        .windowResizability(.automatic)
+        .windowResizability(.contentMinSize)
         .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(replacing: .newItem) {

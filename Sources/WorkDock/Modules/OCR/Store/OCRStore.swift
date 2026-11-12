@@ -2,10 +2,11 @@ import AppKit
 import Combine
 import Foundation
 
-/// Observable state shared by the module page and the floating result panel.
+/// Observable state for the OCR module page.
 ///
-/// The module owns exactly one store; both surfaces observe it, so a run
-/// started from a global shortcut is visible everywhere at once.
+/// The module owns exactly one store and the page observes it, so a run
+/// started from a menu item or a global shortcut is visible as soon as the
+/// page is shown. There is no second result surface.
 ///
 /// Results are memory-only. Nothing is written to disk, and closing the app
 /// discards the current image and text.
@@ -22,8 +23,8 @@ final class OCRStore: ObservableObject {
         var isBusy: Bool { self == .capturing || self == .recognizing }
     }
 
-    /// Editable recognition result. The panel and the module page edit the
-    /// same value. The image stays in memory with it and is discarded on quit.
+    /// Editable recognition result shown by the module page. The image stays
+    /// in memory with it and is discarded on quit.
     @Published var text: String = ""
     @Published private(set) var imageData: Data?
     @Published private(set) var phase: Phase = .idle
@@ -31,6 +32,48 @@ final class OCRStore: ObservableObject {
     @Published private(set) var permissionBlocked = false
     @Published private(set) var lastSource: OCRSource = .screen
     @Published private(set) var copied = false
+
+    // MARK: - Cleanup preferences
+
+    /// Stable `UserDefaults` keys for the two cleanup options. Dotted and
+    /// OCR-scoped so they cannot collide with the framework or another module.
+    nonisolated static let stripLineBreaksKey = "ocr.stripLineBreaks"
+    nonisolated static let stripSpacesKey = "ocr.stripSpaces"
+
+    /// Drop line breaks from the next recognition result. Off by default.
+    ///
+    /// The choice is persisted right away but read only when a result arrives,
+    /// so toggling it never edits the text already in the editor.
+    @Published var stripLineBreaks: Bool {
+        didSet {
+            guard stripLineBreaks != oldValue else { return }
+            defaults.set(stripLineBreaks, forKey: Self.stripLineBreaksKey)
+        }
+    }
+
+    /// Drop spaces from the next recognition result. Off by default.
+    @Published var stripSpaces: Bool {
+        didSet {
+            guard stripSpaces != oldValue else { return }
+            defaults.set(stripSpaces, forKey: Self.stripSpacesKey)
+        }
+    }
+
+    /// Cleanup the next result goes through, from the current options.
+    var textCleanup: OCRTextCleanup {
+        OCRTextCleanup(stripLineBreaks: stripLineBreaks, stripSpaces: stripSpaces)
+    }
+
+    private let defaults: UserDefaults
+
+    /// - Parameter defaults: Preference store holding the cleanup options.
+    ///   Injected so tests use a throwaway suite instead of the app's
+    ///   preferences; the app passes the standard suite.
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        self.stripLineBreaks = defaults.bool(forKey: Self.stripLineBreaksKey)
+        self.stripSpaces = defaults.bool(forKey: Self.stripSpacesKey)
+    }
 
     var isBusy: Bool { phase.isBusy }
 
@@ -59,8 +102,14 @@ final class OCRStore: ObservableObject {
         phase = .recognizing
     }
 
+    /// Publishes a completed run.
+    ///
+    /// The raw Vision text stays in ``recognition`` for the statistics; the
+    /// editable field receives the same text after the cleanup options are
+    /// applied. The options are read here, once, so a later toggle can neither
+    /// rewrite this result nor a manual edit on top of it.
     func finish(_ result: OCRRecognition, image data: Data, source: OCRSource) {
-        text = result.text
+        text = textCleanup.apply(to: result.text)
         recognition = result
         imageData = data
         lastSource = source

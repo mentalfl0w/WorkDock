@@ -158,6 +158,9 @@ public enum L {
     public static let ocrScreenSource = isZh ? "截图" : "Screen"
     public static let ocrClipboardSource = isZh ? "剪贴板" : "Clipboard"
     public static let ocrFileSource = isZh ? "图片" : "Image"
+    public static let ocrCleanupLineBreaks = isZh ? "去掉换行符和回车" : "Remove CR and LF"
+    public static let ocrCleanupSpaces = isZh ? "去掉空格" : "Remove spaces"
+    public static let ocrCleanupHint = isZh ? "只对之后识别出的结果生效，不会改动当前文本。" : "Applies to new results only; the current text is kept as it is."
 
     public static func ocrImageUnreadable(_ name: String) -> String {
         isZh ? "无法读取“\(name)”。" : "Could not read “\(name)”."

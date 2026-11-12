@@ -21,7 +21,12 @@ final class AppContainer: ObservableObject {
     private let log = Logger(subsystem: "cn.dylanliu.workdock", category: "Container")
 
     init() {
-        notifications.attach(router: router)
+        // A smoke run must not reach Notification Center: connecting the
+        // delegate alone registers the throwaway bundle with the notification
+        // daemon. The probe never posts or reads notifications.
+        if !GUISmoke.isEnabled {
+            notifications.attach(router: router)
+        }
         log.info("container wired")
     }
 
@@ -40,10 +45,23 @@ final class AppContainer: ObservableObject {
         // prompt is still on screen, and the module it routes to must already
         // be registered by then.
         registerModules()
+        // A smoke launch owns the process: it drives the OCR page and exits.
+        // It must not trigger a permission prompt the run cannot answer.
+        if GUISmoke.isEnabled {
+            await GUISmoke.run(router: router, registry: registry)
+            return
+        }
         await notifications.requestAuthorization()
     }
 
     private func registerModules() {
+        // A smoke launch needs the OCR page and nothing else: the other modules
+        // start timers, register a global shortcut, or read credentials, none
+        // of which belongs in a smoke run.
+        if GUISmoke.isEnabled {
+            registry.register(OCRModule(router: router))
+            return
+        }
         // Modules register here. FujianEducation is the first; future modules
         // append in display order.
         let fjjyt = FujianEducationModule(
