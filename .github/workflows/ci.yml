@@ -43,6 +43,26 @@ concurrency:
 
 jobs:
   # ---------------------------------------------------------------------------
+  # Test job: XCTest suite (OCR pipeline, store state machine, proxy policy).
+  # Runs in parallel with the build so a red test is visible without waiting
+  # for the DMG.
+  # ---------------------------------------------------------------------------
+  test:
+    name: Test (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: brew install pkg-config
+
+      - name: Run tests
+        run: swift test
+
+  # ---------------------------------------------------------------------------
   # Build job: runs on every trigger. Produces a signed DMG and uploads it
   # as a build artifact. On tag pushes the same DMG is attached to the
   # GitHub Release by the release job below.

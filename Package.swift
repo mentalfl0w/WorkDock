@@ -25,7 +25,8 @@ let package = Package(
         .testTarget(
             name: "WorkDockTests",
             dependencies: ["WorkDock"],
-            path: "Tests/WorkDockTests"
+            path: "Tests/WorkDockTests",
+            resources: [.copy("Fixtures/ocr-bilingual.png")]
         ),
     ]
 )
