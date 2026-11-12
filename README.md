@@ -14,11 +14,34 @@ Open **Screenshot OCR** from the gallery or menu bar to capture a screen region,
 recognize a clipboard image, or choose an image file. Recognition uses Apple's
 Vision framework locally for Simplified Chinese and English. Results can be
 edited and copied; they are not stored as history.
+Screenshot and shortcut results appear in the same module page.
+The first Vision call may take longer than subsequent calls.
 
 The module settings let you enable, customize, or reset the global screenshot
 shortcut. WorkDock must be running for the shortcut to work. Screen capture
 requires macOS Screen Recording permission; image files and clipboard images
 do not. If a shortcut cannot be registered, choose another combination.
+
+## Tests
+
+```bash
+swift test
+```
+
+The suite covers the OCR store state machine, the Vision input/error contract,
+and a real recognition pass over `Tests/WorkDockTests/Fixtures/ocr-bilingual.png`
+(English + Simplified Chinese).
+
+The GUI smoke run is opt-in and needs a logged-in macOS session. It packages a
+throwaway copy of the app with its own bundle identifier and a temporary home,
+navigates to the OCR page, shrinks the window to the smallest size the app
+allows, and checks that exactly one visible app window remains and the page
+still scrolls. It never runs OCR or captures the screen, and it does not request
+Accessibility, Screen Recording, or notification permission.
+
+```bash
+./gui-smoke.sh
+```
 
 ## Build
 
